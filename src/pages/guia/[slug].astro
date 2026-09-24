@@ -1,0 +1,25 @@
+---
+// Capítulos todavía no redactados: se publican con su contenido previsto para
+// que el índice sea navegable y la estructura pueda revisarse.
+import Guide from '../../layouts/Guide.astro';
+import { capitulos, type Capitulo } from '../../data/toc';
+
+export function getStaticPaths() {
+  return capitulos
+    .filter((c) => !c.listo)
+    .map((c) => ({ params: { slug: c.slug }, props: { cap: c } }));
+}
+
+const { cap } = Astro.props as { cap: Capitulo };
+---
+
+<Guide frontmatter={{ num: cap.num, titulo: cap.titulo }}>
+  <div class="callout callout--nota">
+    <p class="callout__label">Capítulo en redacción</p>
+    <p>Este capítulo todavía no está disponible. A continuación se detalla el contenido previsto.</p>
+  </div>
+  <h2 id="previsto">Contenido previsto</h2>
+  <ul>
+    {cap.previsto?.map((item) => <li>{item}</li>)}
+  </ul>
+</Guide>

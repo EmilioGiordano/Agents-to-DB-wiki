@@ -1,0 +1,527 @@
+---
+layout: ../../layouts/Guide.astro
+num: '4'
+titulo: Conexión paso a paso
+lede: Este capítulo describe cómo conectar una base PostgreSQL o MySQL a cada cliente mediante un servidor MCP. Para cada caso se ofrecen dos caminos, la configuración manual y un prompt para que el propio agente la realice, y se indica cómo verificar que la conexión funciona.
+secciones:
+  - { n: '4.1', id: 'servidor', titulo: 'Elección del servidor MCP' }
+  - { n: '4.2', id: 'preparacion', titulo: 'Preparación' }
+  - { n: '4.3', id: 'dbhub', titulo: 'Configuración de DBHub' }
+  - { n: '4.4', id: 'cliente', titulo: 'Registro en el cliente' }
+  - { n: '4.5', id: 'nube', titulo: 'Bases en la nube' }
+  - { n: '4.6', id: 'verificacion', titulo: 'Verificación y problemas' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Prompt from '../../components/Prompt.astro';
+import PorMotor from '../../components/PorMotor.astro';
+import Motor from '../../components/Motor.astro';
+import PorCliente from '../../components/PorCliente.astro';
+import Cliente from '../../components/Cliente.astro';
+
+<Objetivos>
+- Configurar un servidor MCP de base de datos en modo de solo lectura.
+- Registrar ese servidor en el cliente utilizado, sin escribir contraseñas en archivos versionados.
+- Conectar bases de datos en la nube mediante los servidores MCP de cada servicio.
+- Verificar la conexión y resolver los problemas más frecuentes.
+</Objetivos>
+
+<Recuadro tipo="advertencia">
+Este capítulo supone que ya se creó el usuario `agente_lectura` según el capítulo 3. Conectar un agente con el usuario administrador anula todas las precauciones que siguen.
+</Recuadro>
+
+<Seccion n="4.1" id="servidor">Elección del servidor MCP</Seccion>
+
+Existen numerosos servidores MCP para bases de datos. Para esta guía se recomienda **DBHub**, un servidor de código abierto mantenido por Bytebase, por cuatro razones: admite PostgreSQL, MySQL y MariaDB con la misma configuración; se ejecuta con un único comando, sin instalar Python ni otros programas; ofrece un modo de solo lectura y un límite de filas por consulta; y expone solo dos herramientas, lo que facilita entender qué hace el agente.
+
+| Servidor | Motores | Observaciones |
+| --- | --- | --- |
+| DBHub | PostgreSQL, MySQL, MariaDB, SQL Server, SQLite | Recomendado. Modo de solo lectura y límite de filas configurables |
+| Postgres MCP Pro | PostgreSQL | Incluye análisis de índices y de salud de la base; requiere Python |
+| MCP Toolbox for Databases (Google) | PostgreSQL, MySQL y otros | Orientado a entornos empresariales y a Google Cloud |
+| Neon, Supabase, InsForge | PostgreSQL del propio servicio | Servidores remotos oficiales de cada servicio (sección 4.5) |
+
+<Nota>
+**Servidor de referencia archivado.** El servidor de PostgreSQL publicado originalmente como ejemplo del protocolo fue archivado en mayo de 2025 y no debe utilizarse. El capítulo 7 comenta la vulnerabilidad que lo afectaba.
+</Nota>
+
+<Seccion n="4.2" id="preparacion">Preparación</Seccion>
+
+<Cliente ids="chatgpt">
+<Recuadro tipo="nota" titulo="ChatGPT">
+ChatGPT no puede iniciar servidores locales ni acceder a una base en la computadora del usuario. Las secciones 4.2 a 4.4 no se aplican a este cliente: la conexión se realiza con una base en la nube, según la sección 4.5.
+</Recuadro>
+</Cliente>
+
+<Cliente ids="claude-desktop">
+<Recuadro tipo="nota" titulo="versión web de Claude">
+Las secciones 4.2 a 4.4 se aplican a la aplicación de escritorio. La versión web no puede iniciar servidores locales: con ella, la conexión se realiza con una base en la nube, según la sección 4.5.
+</Recuadro>
+</Cliente>
+
+**1. Node.js.** DBHub requiere Node.js 22.5 o superior. La versión instalada se consulta con:
+
+```sh
+node --version
+```
+
+**2. Base de datos de ejemplo.** Debe estar creada y cargada según el [apéndice A](../a-bases-de-ejemplo/).
+
+**3. Variable de entorno con la cadena de conexión.** La cadena de conexión del usuario `agente_lectura` se guarda en una variable de entorno del usuario llamada `DB_LECTURA_URL`. De este modo, ningún archivo del proyecto contiene la contraseña.
+
+<PorMotor>
+<Motor id="postgresql" titulo="Windows (PowerShell): se ejecuta una sola vez">
+
+```powershell
+[Environment]::SetEnvironmentVariable("DB_LECTURA_URL", "postgres://agente_lectura:‹CONTRASEÑA›@localhost:5432/cadena_cines", "User")
+```
+
+</Motor>
+<Motor id="mysql" titulo="Windows (PowerShell): se ejecuta una sola vez">
+
+```powershell
+[Environment]::SetEnvironmentVariable("DB_LECTURA_URL", "mysql://agente_lectura:‹CONTRASEÑA›@localhost:3306/cadena_cines", "User")
+```
+
+</Motor>
+</PorMotor>
+
+<PorMotor>
+<Motor id="postgresql" titulo="macOS y Linux: agregar al final de ~/.zshrc o ~/.bashrc">
+
+```sh
+export DB_LECTURA_URL="postgres://agente_lectura:‹CONTRASEÑA›@localhost:5432/cadena_cines"
+```
+
+</Motor>
+<Motor id="mysql" titulo="macOS y Linux: agregar al final de ~/.zshrc o ~/.bashrc">
+
+```sh
+export DB_LECTURA_URL="mysql://agente_lectura:‹CONTRASEÑA›@localhost:3306/cadena_cines"
+```
+
+</Motor>
+</PorMotor>
+
+Después de definir la variable deben cerrarse y volver a abrirse la terminal y el cliente, ya que los programas leen las variables de entorno al iniciarse.
+
+<div data-engine-only="mysql">
+
+<Recuadro tipo="nota" titulo="MariaDB y XAMPP">
+Si el servidor es MariaDB, como el que incluye XAMPP, conviene usar el prefijo `mariadb://` en lugar de `mysql://`. El resto de la cadena no cambia.
+</Recuadro>
+
+</div>
+
+<Seccion n="4.3" id="dbhub">Configuración de DBHub</Seccion>
+
+La configuración de DBHub se escribe en un archivo `dbhub.toml`, ubicado en la carpeta del proyecto. Como la cadena de conexión se toma de la variable de entorno, el archivo no contiene secretos y puede versionarse con el resto del proyecto.
+
+```toml
+# dbhub.toml
+[[sources]]
+id = "cadena_cines"
+dsn = "${DB_LECTURA_URL}"
+query_timeout = 30          # segundos
+
+[[tools]]
+name = "execute_sql"
+source = "cadena_cines"
+readonly = true             # rechaza sentencias que no sean de lectura
+max_rows = 200              # máximo de filas devueltas al modelo
+
+[[tools]]
+name = "search_objects"     # búsqueda de tablas, columnas e índices
+source = "cadena_cines"
+```
+
+<Nota>
+**Varias bases.** Un mismo archivo puede declarar varios bloques `[[sources]]`, por ejemplo una base PostgreSQL y otra MySQL, cada uno con sus propias herramientas. El capítulo 6 aprovecha esta posibilidad.
+</Nota>
+
+Con esta configuración, el agente dispone de dos herramientas: `execute_sql`, para ejecutar consultas, y `search_objects`, para explorar el esquema. Si el agente intenta una modificación, DBHub la rechaza con un error `READONLY_VIOLATION` antes de enviarla a la base. Esta es una segunda barrera: la primera, y la más importante, sigue siendo que `agente_lectura` no tiene privilegios de escritura.
+
+<Seccion n="4.4" id="cliente">Registro en el cliente</Seccion>
+
+El último paso es indicarle al cliente cómo iniciar DBHub. Las instrucciones dependen del cliente elegido en la barra superior o en las pestañas siguientes.
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+Desde la carpeta del proyecto se ejecuta el siguiente comando. La opción `--scope project` guarda la configuración en el archivo `.mcp.json` del proyecto, pensado para versionarse y compartirse con el equipo.
+
+```sh
+claude mcp add cadena-cines --scope project -- npx -y @bytebase/dbhub@latest --transport stdio --config dbhub.toml
+```
+
+El comando genera el siguiente archivo, que también puede escribirse a mano:
+
+```json
+{
+  "mcpServers": {
+    "cadena-cines": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@bytebase/dbhub@latest",
+        "--transport",
+        "stdio",
+        "--config",
+        "dbhub.toml"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+Al iniciar Claude Code en esa carpeta, se solicita autorización para usar los servidores definidos en `.mcp.json`. El estado de la conexión se consulta con el comando `/mcp` dentro de la sesión, o con `claude mcp list` desde la terminal.
+
+</Cliente>
+
+<Cliente ids="codex">
+
+Codex guarda la configuración en `~/.codex/config.toml` (o en `.codex/config.toml` dentro de un proyecto marcado como confiable). Puede usarse el comando `codex mcp add`, pero es preferible editar el archivo para indicar la ruta completa de `dbhub.toml` y reenviar la variable de entorno sin copiar su valor:
+
+```toml
+[mcp_servers.cadena-cines]
+command = "npx"
+args = [
+  "-y", "@bytebase/dbhub@latest",
+  "--transport", "stdio",
+  "--config", "‹RUTA_DEL_PROYECTO›/dbhub.toml",
+]
+env_vars = ["DB_LECTURA_URL"]   # reenvía la variable del entorno del usuario
+```
+
+La lista de servidores se consulta con `codex mcp list` o con `/mcp` dentro de la sesión.
+
+<Nota>
+**`env` y `env_vars`.** La opción `env` fija un valor dentro del archivo; `env_vars`, en cambio, indica qué variables del entorno se reenvían al servidor. Para credenciales corresponde la segunda.
+</Nota>
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+OpenCode se configura en el archivo `opencode.json` del proyecto (o en `~/.config/opencode/opencode.json` para todos los proyectos). Los servidores locales se declaran con `"type": "local"` y el comando como lista:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "cadena-cines": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@bytebase/dbhub@latest",
+        "--transport",
+        "stdio",
+        "--config",
+        "dbhub.toml"
+      ],
+      "environment": { "DB_LECTURA_URL": "{env:DB_LECTURA_URL}" },
+      "enabled": true
+    }
+  }
+}
+```
+
+Los servidores configurados se listan con `opencode mcp list`.
+
+<Recuadro tipo="advertencia">
+Según su documentación, OpenCode permite por defecto todas las operaciones sin pedir aprobación. Conviene configurar la sección `permission` del mismo archivo para que solicite confirmación, y confiar en que el usuario de solo lectura es la barrera principal.
+</Recuadro>
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+Cursor lee la configuración de `.cursor/mcp.json` en el proyecto (o de `~/.cursor/mcp.json` para todos los proyectos). Las variables de entorno se referencian con la sintaxis `${env:NOMBRE}`:
+
+```json
+{
+  "mcpServers": {
+    "cadena-cines": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@bytebase/dbhub@latest",
+        "--transport",
+        "stdio",
+        "--config",
+        "${workspaceFolder}/dbhub.toml"
+      ],
+      "env": { "DB_LECTURA_URL": "${env:DB_LECTURA_URL}" }
+    }
+  }
+}
+```
+
+Por defecto, Cursor solicita aprobación antes de usar una herramienta MCP. Los registros de conexión se consultan en el panel Output, canal «MCP Logs».
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+La aplicación de escritorio de Claude (Windows y macOS) admite servidores locales. La configuración se abre desde Settings → Developer → Edit Config, que edita el archivo `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "cadena-cines": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@bytebase/dbhub@latest",
+        "--transport",
+        "stdio",
+        "--config",
+        "‹RUTA_DEL_PROYECTO›/dbhub.toml"
+      ]
+    }
+  }
+}
+```
+
+Después de guardar el archivo debe cerrarse la aplicación por completo y volver a abrirla. En Windows, la variable `DB_LECTURA_URL` definida en la sección 4.2 es heredada por el servidor. Los registros se encuentran en `%APPDATA%\Claude\logs` (Windows) o `~/Library/Logs/Claude` (macOS).
+
+<Recuadro tipo="nota" titulo="macOS">
+
+En macOS, las aplicaciones abiertas desde el Dock o el Finder no leen `~/.zshrc`, por lo que no reciben la variable definida en la sección 4.2. En ese caso debe agregarse a la entrada del servidor un bloque `"env": { "DB_LECTURA_URL": "‹CADENA_DE_CONEXIÓN›" }`. El archivo `claude_desktop_config.json` es personal y no forma parte del repositorio, pero la contraseña queda escrita en él: debe protegerse como cualquier archivo de credenciales.
+
+</Recuadro>
+
+<Nota>
+**Versión web.** La versión web de Claude no puede ejecutar servidores locales ni alcanzar una base en la computadora del usuario. Para bases en la nube, véase la sección 4.5.
+</Nota>
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+ChatGPT solo admite servidores MCP **remotos**, accesibles por HTTPS desde internet, y requiere activar el modo desarrollador (Settings → Security and login → Developer mode) en una cuenta Plus, Pro, Business, Enterprise o Education. En consecuencia, no puede conectarse a una base local con la configuración de este capítulo.
+
+La alternativa práctica es utilizar una base en la nube con su servidor MCP remoto oficial (sección 4.5). ChatGPT solicita confirmación antes de ejecutar acciones de escritura.
+
+</Cliente>
+
+</PorCliente>
+
+### Configuración delegada al agente
+
+En los clientes con capacidad de agente (Claude Code, Codex, OpenCode y Cursor), toda la sección puede delegarse al propio agente. El prompt siguiente está redactado para que el agente no escriba la contraseña en ningún archivo, y se adapta al cliente seleccionado:
+
+<Cliente ids="claude-code">
+<Prompt titulo="configurar la conexión en Claude Code">
+Configure en este proyecto un servidor MCP llamado cadena-cines que utilice DBHub (paquete @bytebase/dbhub) por stdio. Cree un archivo dbhub.toml con una fuente que tome la cadena de conexión de la variable de entorno DB_LECTURA_URL, con la herramienta execute_sql en modo readonly y max_rows = 200, y la herramienta search_objects. Registre el servidor con alcance de proyecto, en el archivo .mcp.json. No escriba contraseñas ni cadenas de conexión en ningún archivo: si la variable DB_LECTURA_URL no existe, indíqueme el comando para crearla en mi sistema operativo y yo completaré la contraseña. Al terminar, indíqueme cómo verificar la conexión.
+</Prompt>
+</Cliente>
+
+<Cliente ids="codex">
+<Prompt titulo="configurar la conexión en Codex">
+Configure un servidor MCP llamado cadena-cines que utilice DBHub (paquete @bytebase/dbhub) por stdio. Cree en este proyecto un archivo dbhub.toml con una fuente que tome la cadena de conexión de la variable de entorno DB_LECTURA_URL, con la herramienta execute_sql en modo readonly y max_rows = 200, y la herramienta search_objects. Registre el servidor en ~/.codex/config.toml indicando la ruta absoluta de dbhub.toml, y reenvíe la variable con env_vars = ["DB_LECTURA_URL"]. No escriba contraseñas ni cadenas de conexión en ningún archivo: si la variable DB_LECTURA_URL no existe, indíqueme el comando para crearla en mi sistema operativo y yo completaré la contraseña. Al terminar, indíqueme cómo verificar la conexión.
+</Prompt>
+</Cliente>
+
+<Cliente ids="opencode">
+<Prompt titulo="configurar la conexión en OpenCode">
+Configure en este proyecto un servidor MCP local llamado cadena-cines que utilice DBHub (paquete @bytebase/dbhub) por stdio. Cree un archivo dbhub.toml con una fuente que tome la cadena de conexión de la variable de entorno DB_LECTURA_URL, con la herramienta execute_sql en modo readonly y max_rows = 200, y la herramienta search_objects. Registre el servidor en opencode.json, transmitiendo la variable con \{env:DB_LECTURA_URL\}, y configure la sección permission para que se solicite confirmación antes de usar herramientas. No escriba contraseñas ni cadenas de conexión en ningún archivo: si la variable DB_LECTURA_URL no existe, indíqueme el comando para crearla en mi sistema operativo y yo completaré la contraseña. Al terminar, indíqueme cómo verificar la conexión.
+</Prompt>
+</Cliente>
+
+<Cliente ids="cursor">
+<Prompt titulo="configurar la conexión en Cursor">
+Configure en este proyecto un servidor MCP llamado cadena-cines que utilice DBHub (paquete @bytebase/dbhub) por stdio. Cree un archivo dbhub.toml con una fuente que tome la cadena de conexión de la variable de entorno DB_LECTURA_URL, con la herramienta execute_sql en modo readonly y max_rows = 200, y la herramienta search_objects. Registre el servidor en .cursor/mcp.json, usando $\{workspaceFolder\} para la ruta de dbhub.toml y $\{env:DB_LECTURA_URL\} para la variable. No escriba contraseñas ni cadenas de conexión en ningún archivo: si la variable DB_LECTURA_URL no existe, indíqueme el comando para crearla en mi sistema operativo y yo completaré la contraseña. Al terminar, indíqueme cómo verificar la conexión.
+</Prompt>
+</Cliente>
+
+<Cliente ids="claude-desktop chatgpt">
+<Recuadro tipo="nota">
+El cliente seleccionado no puede editar archivos de configuración ni ejecutar comandos, por lo que la configuración debe realizarse manualmente según las instrucciones anteriores.
+</Recuadro>
+</Cliente>
+
+<Seccion n="4.5" id="nube">Bases de datos en la nube</Seccion>
+
+Para una base en la nube hay dos alternativas. La primera es usar DBHub exactamente como en las secciones anteriores, con la cadena de conexión que provee el servicio; en PostgreSQL suele requerir el parámetro `?sslmode=require` al final. La segunda es usar el servidor MCP remoto del propio servicio, que no requiere instalar nada y se autentica mediante el navegador.
+
+| Servicio | Dirección del servidor MCP | Solo lectura |
+| --- | --- | --- |
+| Neon | `https://mcp.neon.tech/mcp` | Parámetro `?readonly=true` |
+| Supabase | `https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›` | Parámetro `&read_only=true` |
+| InsForge | `https://mcp.insforge.dev/mcp` | Sin opción documentada |
+
+El registro de un servidor remoto depende del cliente. Los ejemplos utilizan el servidor de Supabase; para Neon o InsForge basta con reemplazar la dirección. En todos los casos, la primera conexión abre el navegador para autorizar el acceso a la cuenta del servicio.
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+```sh
+claude mcp add --transport http supabase "https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›&read_only=true&features=database,docs"
+```
+
+La autorización se completa desde el comando `/mcp` dentro de la sesión.
+
+</Cliente>
+
+<Cliente ids="codex">
+
+```sh
+codex mcp add supabase --url "https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›&read_only=true&features=database,docs"
+codex mcp login supabase
+```
+
+El segundo comando abre el navegador para autorizar el acceso a la cuenta del servicio.
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+En `opencode.json`, los servidores remotos se declaran con `"type": "remote"`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›&read_only=true&features=database,docs",
+      "enabled": true
+    }
+  }
+}
+```
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+En `.cursor/mcp.json`, un servidor remoto se declara solo con su dirección:
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›&read_only=true&features=database,docs"
+    }
+  }
+}
+```
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+En la aplicación de escritorio y en la versión web de Claude, los servidores remotos se agregan como **conectores personalizados** desde Customize → Connectors, indicando la dirección del servidor:
+
+```text
+https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›&read_only=true&features=database,docs
+```
+
+En los planes Team y Enterprise, los conectores los agrega quien administra la organización. La conexión se origina en la infraestructura de Anthropic, por lo que el servidor debe ser accesible desde internet.
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+1. Activar el modo desarrollador en Settings → Security and login → Developer mode.
+2. En la sección de plugins de ChatGPT, usar el botón «+» para crear una aplicación en modo desarrollador con la dirección del servidor:
+
+```text
+https://mcp.supabase.com/mcp?project_ref=‹ID_DEL_PROYECTO›&read_only=true&features=database,docs
+```
+
+El botón «+» solo crea aplicaciones en modo desarrollador cuando ese modo está activado. ChatGPT admite servidores con los protocolos SSE y HTTP con *streaming*.
+
+</Cliente>
+
+</PorCliente>
+
+<Recuadro tipo="advertencia">
+Neon y Supabase recomiendan expresamente usar sus servidores MCP con bases de desarrollo y no de producción, habilitar el modo de solo lectura, limitar el acceso a un único proyecto y revisar cada acción antes de aprobarla. Salvo que se active el modo de solo lectura, un servidor remoto opera con los permisos de la cuenta del desarrollador, no con los de un usuario restringido de la base.
+</Recuadro>
+
+<Seccion n="4.6" id="verificacion">Verificación y problemas frecuentes</Seccion>
+
+Una vez configurado el cliente, la primera tarea del agente debería ser la verificación propuesta en la sección 3.4:
+
+<Prompt titulo="verificar la conexión">
+Utilizando el servidor MCP de la base de datos, indique con qué usuario está conectado, liste las tablas de la base y la cantidad de filas de cada una. Luego intente ejecutar DELETE FROM entradas WHERE identrada = 1 y muéstreme el mensaje de error que obtiene.
+</Prompt>
+
+El intento de borrado debe fallar. Si no falla, debe revisarse de inmediato la configuración del usuario (capítulo 3).
+
+### Estado de la conexión en el cliente seleccionado
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+- `/mcp` dentro de la sesión muestra los servidores, su estado y sus herramientas, y permite completar autorizaciones pendientes.
+- `claude mcp list` lista los servidores y verifica la conexión desde la terminal.
+- `claude mcp get cadena-cines` muestra la configuración de un servidor.
+- Un servidor de `.mcp.json` que figura como pendiente de aprobación se habilita iniciando `claude` en la carpeta del proyecto y aceptando la solicitud.
+
+</Cliente>
+
+<Cliente ids="codex">
+
+- `/mcp` dentro de la sesión muestra los servidores activos.
+- `codex mcp list` lista los servidores configurados.
+- Si el servidor no inicia, conviene verificar que la ruta de `dbhub.toml` en `config.toml` sea absoluta.
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+- `opencode mcp list` lista los servidores configurados.
+- `opencode mcp debug cadena-cines` muestra información de diagnóstico de un servidor.
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+- El panel de configuración de MCP del editor muestra los servidores y su estado.
+- Los registros de conexión se consultan en el panel Output, canal «MCP Logs».
+- Con la línea de comandos de Cursor: `agent mcp list` y `agent mcp list-tools cadena-cines`.
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+- Los servidores y conectores activos se consultan desde el menú «+» de la conversación, en Connectors → Manage connectors.
+- Los registros de los servidores locales se encuentran en `%APPDATA%\Claude\logs` (Windows) o `~/Library/Logs/Claude` (macOS), en los archivos `mcp*.log`.
+- Si la cadena de conexión aparece vacía solo en macOS, la variable debe definirse en el bloque `env` de la configuración (sección 4.4).
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+- La aplicación creada en modo desarrollador debe figurar en la sección de plugins de ChatGPT.
+- Si no responde, debe verificarse que la dirección del servidor sea accesible desde internet: ChatGPT no alcanza servidores locales.
+- Antes de ejecutar herramientas, ChatGPT muestra la solicitud de confirmación con los datos que enviará; conviene revisarlos siempre.
+
+</Cliente>
+
+</PorCliente>
+
+| Síntoma | Causa probable | Solución |
+| --- | --- | --- |
+| El servidor no aparece en el cliente | El cliente no se reinició o el archivo tiene un error de sintaxis | Reiniciar el cliente y validar el JSON o TOML |
+| `password authentication failed` / `Access denied` | Contraseña incorrecta o con caracteres especiales sin codificar | Verificar la contraseña; codificar `@ : / # ? %` (sección 3.6) |
+| `ECONNREFUSED` | El motor no está en ejecución o escucha en otro puerto | Iniciar el servicio y verificar el puerto (5432 o 3306) |
+| La cadena de conexión aparece vacía | El cliente se inició antes de definir la variable de entorno | Cerrar y volver a abrir la terminal y el cliente |
+| La cadena aparece vacía solo en una aplicación de escritorio de macOS | Las aplicaciones abiertas desde el Dock no leen `~/.zshrc` | Definir la variable en el bloque `env` de la configuración del cliente |
+| Error al ejecutar `npx` | Node.js no instalado o en una versión anterior a la 22.5 | Instalar o actualizar Node.js |
+| No encuentra `dbhub.toml` | El cliente se inició desde otra carpeta | Usar la ruta completa del archivo en `--config` |
+
+<Nota>
+**Windows.** Si un cliente no logra iniciar `npx` en Windows, una alternativa habitual es reemplazar el comando por `cmd` y anteponer `/c`, `npx` a los argumentos. Solo debe recurrirse a ella si la configuración normal falla.
+</Nota>

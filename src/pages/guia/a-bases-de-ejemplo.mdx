@@ -1,0 +1,123 @@
+---
+layout: ../../layouts/Guide.astro
+num: 'A'
+titulo: Bases de datos de ejemplo
+lede: La guía utiliza versiones propias de tres casos de estudio de la asignatura. Este apéndice describe cada base y ofrece los scripts de creación y carga para PostgreSQL y MySQL.
+secciones:
+  - { n: 'A.1', id: 'descargas', titulo: 'Descargas' }
+  - { n: 'A.2', id: 'carga', titulo: 'Creación y carga' }
+  - { n: 'A.3', id: 'tu-cine', titulo: 'Tu Cine' }
+  - { n: 'A.4', id: 'gimnasio', titulo: 'Gimnasio' }
+  - { n: 'A.5', id: 'heladeria', titulo: 'Heladería' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import PorMotor from '../../components/PorMotor.astro';
+import Motor from '../../components/Motor.astro';
+import Descarga from '../../components/Descarga.astro';
+
+<Seccion n="A.1" id="descargas">Descargas</Seccion>
+
+Los scripts crean las tablas y cargan los datos en una base existente. Son independientes entre sí y pueden ejecutarse nuevamente: eliminan las tablas antes de crearlas.
+
+<div data-engine-only="postgresql">
+<div class="downloads">
+  <Descarga href="/sql/postgresql/tu_cine.sql" nombre="tu_cine.sql" detalle="PostgreSQL 13 o superior. Unas 144 000 entradas." />
+  <Descarga href="/sql/postgresql/gimnasio.sql" nombre="gimnasio.sql" detalle="PostgreSQL 13 o superior. Datos ficticios." />
+  <Descarga href="/sql/postgresql/heladeria.sql" nombre="heladeria.sql" detalle="PostgreSQL 13 o superior. Incluye un disparador." />
+</div>
+</div>
+
+<div data-engine-only="mysql">
+<div class="downloads">
+  <Descarga href="/sql/mysql/tu_cine.sql" nombre="tu_cine.sql" detalle="MySQL 8.0.16+ o MariaDB 10.4+. Unas 144 000 entradas." />
+  <Descarga href="/sql/mysql/gimnasio.sql" nombre="gimnasio.sql" detalle="MySQL 8.0.16+ o MariaDB 10.4+. Datos ficticios." />
+  <Descarga href="/sql/mysql/heladeria.sql" nombre="heladeria.sql" detalle="MySQL 8.0.16+ o MariaDB 10.4+. Incluye un disparador." />
+</div>
+</div>
+
+<Recuadro tipo="nota" titulo="inconsistencias intencionales">
+Los datos contienen, a propósito, algunas inconsistencias, y el esquema de *Gimnasio* reproduce decisiones de diseño discutibles. Se analizan en los capítulos 1, 6 y 7, y constituyen la base de la práctica del capítulo 8.
+</Recuadro>
+
+<Seccion n="A.2" id="carga">Creación y carga</Seccion>
+
+Los comandos se ejecutan desde la carpeta en la que se descargaron los scripts, con el usuario administrador del motor.
+
+<PorMotor>
+<Motor id="postgresql" titulo="Terminal (PostgreSQL)">
+
+```sh
+createdb -U postgres cadena_cines
+psql -U postgres -d cadena_cines -f tu_cine.sql
+
+createdb -U postgres gimnasio
+psql -U postgres -d gimnasio -f gimnasio.sql
+
+createdb -U postgres heladeria
+psql -U postgres -d heladeria -f heladeria.sql
+```
+
+</Motor>
+<Motor id="mysql" titulo="Terminal (MySQL)">
+
+```sh
+mysql -u root -p -e "CREATE DATABASE cadena_cines CHARACTER SET utf8mb4"
+mysql -u root -p cadena_cines < tu_cine.sql
+
+mysql -u root -p -e "CREATE DATABASE gimnasio CHARACTER SET utf8mb4"
+mysql -u root -p gimnasio < gimnasio.sql
+
+mysql -u root -p -e "CREATE DATABASE heladeria CHARACTER SET utf8mb4"
+mysql -u root -p heladeria < heladeria.sql
+```
+
+</Motor>
+</PorMotor>
+
+<Nota>
+**Clientes gráficos.** Los scripts también pueden abrirse y ejecutarse desde pgAdmin, MySQL Workbench o DBeaver, conectados a la base correspondiente.
+</Nota>
+
+Los scripts fueron probados sobre PostgreSQL 18 y MariaDB 10.4. La carga de *Tu Cine* demora unos pocos segundos.
+
+<Seccion n="A.3" id="tu-cine">Tu Cine</Seccion>
+
+Cadena de cines con varias sedes. Es la base principal de la guía.
+
+| Tabla | Contenido | Filas |
+| --- | --- | --- |
+| `cines` | Sedes de la cadena | 3 |
+| `peliculas` | Películas en cartel, con género restringido a una lista | 12 |
+| `salas` | Salas de cada cine; `cant_butacas` es una columna calculada | 12 |
+| `butacas` | Butacas de cada sala, identificadas por fila y asiento | 1800 |
+| `funciones` | Funciones de una película en una sala, fecha y hora | 2881 |
+| `entradas` | Entradas vendidas para una butaca y una función, con importe y fecha de venta | 144 001 |
+
+Respecto del caso original de la asignatura, se agregó la columna `entradas.fecha_venta` para los ejemplos de rendimiento, y los dominios se expresaron como restricciones `CHECK` para que el esquema sea equivalente en ambos motores.
+
+<Seccion n="A.4" id="gimnasio">Gimnasio</Seccion>
+
+Gimnasio con clientes, entrenadores, clases y jornadas laborales. Se utiliza para la revisión del modelo (sección 6.3) y para los ejemplos de datos sensibles (sección 3.5).
+
+| Tabla | Contenido |
+| --- | --- |
+| `personas` | Datos personales de clientes y empleados |
+| `clientes`, `entrenadores` | Especializaciones de `personas` |
+| `es_jefe` | Relación jerárquica entre entrenadores |
+| `areas`, `clases`, `reciben` | Clases dictadas por área y clientes inscriptos |
+| `titulos` | Títulos de cada entrenador |
+| `jornadas_laborales` | Días y horarios de trabajo de los empleados |
+| `pagos_clientes` | Pagos de cuotas |
+
+<Seccion n="A.5" id="heladeria">Heladería</Seccion>
+
+Versión reducida del caso *Bariloche Ya*, centrada en los pedidos y en la columna calculada `pedidos.total`, mantenida por un disparador. Se utiliza en las secciones 6.4 y 7.1.
+
+| Tabla | Contenido |
+| --- | --- |
+| `clientes` | Comercios que realizan pedidos |
+| `helados` | Productos y precios vigentes |
+| `pedidos` | Pedidos, con su total calculado |
+| `contiene` | Renglones de cada pedido, con cantidad y precio unitario |

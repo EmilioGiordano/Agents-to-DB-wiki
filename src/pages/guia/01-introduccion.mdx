@@ -1,0 +1,117 @@
+---
+layout: ../../layouts/Guide.astro
+num: '1'
+titulo: Por qué conectar un agente a una base de datos
+lede: Un agente de IA con acceso a una base de datos puede explorar su estructura, escribir consultas y analizar resultados a partir de instrucciones en lenguaje natural. Este capítulo presenta qué se gana con esa conexión, qué no cambia y cómo está organizada la guía.
+secciones:
+  - { n: '1.1', id: 'trabajo-cotidiano', titulo: 'El trabajo cotidiano' }
+  - { n: '1.2', id: 'ejemplo', titulo: 'Un ejemplo con Tu Cine' }
+  - { n: '1.3', id: 'que-cambia', titulo: 'Qué cambia y qué no' }
+  - { n: '1.4', id: 'alcance', titulo: 'Alcance y requisitos' }
+  - { n: '1.5', id: 'como-leer', titulo: 'Cómo leer esta guía' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Prompt from '../../components/Prompt.astro';
+
+<Objetivos>
+- Identificar las tareas habituales sobre una base de datos que un agente de IA puede acelerar.
+- Reconocer por qué el conocimiento de SQL sigue siendo imprescindible para verificar el trabajo del agente.
+- Conocer la organización de la guía y sus convenciones.
+</Objetivos>
+
+<Seccion n="1.1" id="trabajo-cotidiano">El trabajo cotidiano con una base de datos</Seccion>
+
+En un ámbito profesional, la mayor parte del trabajo con bases de datos no consiste en diseñar esquemas desde cero, sino en trabajar sobre esquemas existentes, muchas veces diseñados por otras personas: explorar qué tablas hay y cómo se relacionan, escribir consultas para responder preguntas puntuales, verificar que los datos respeten las reglas del negocio, diagnosticar por qué una consulta es lenta o preparar un cambio de estructura sin romper lo que ya funciona.
+
+Buena parte de ese tiempo se dedica a tareas mecánicas: recordar el nombre exacto de una columna, reconstruir el camino de claves foráneas entre dos tablas o reescribir por enésima vez una consulta parecida a otra. Son precisamente las tareas en las que un agente de IA con acceso a la base resulta más útil.
+
+<Nota>
+**Agente de IA.** Programa que combina un modelo de lenguaje con herramientas para actuar sobre su entorno: leer archivos, ejecutar comandos o, como en esta guía, consultar una base de datos. El capítulo 2 precisa este concepto.
+</Nota>
+
+Conectar un agente a una base de datos es sencillo: requiere unos minutos de configuración. Sin embargo, es frecuente que no se aproveche, ya sea por desconocimiento o por una preocupación legítima sobre qué podría hacer el agente con esos datos. Esta guía aborda ambas cuestiones: cómo realizar la conexión y cómo hacerlo de manera controlada.
+
+<Seccion n="1.2" id="ejemplo">Un ejemplo con Tu Cine</Seccion>
+
+Sobre la base del caso de estudio *Tu Cine* ([apéndice A](../a-bases-de-ejemplo/)) se plantea la siguiente pregunta: **¿cuál es la ocupación promedio de cada sala en las funciones de las 20:00 de marzo?**
+
+Responderla a mano exige recordar que la cantidad de butacas está en `salas.cant_butacas`, que las entradas se asocian a funciones y no a salas, y combinar cuatro tablas con una agregación intermedia. Con un agente conectado, basta con formular la pregunta:
+
+<Prompt>
+¿Cuál es la ocupación promedio de cada sala en las funciones de las 20:00 de marzo de 2026? Muéstreme la consulta SQL que utilizó.
+</Prompt>
+
+El agente explora el esquema, escribe una consulta como la siguiente, la ejecuta e informa el resultado:
+
+<div data-code-title="Consulta escrita por el agente (válida en PostgreSQL y MySQL)">
+
+```sql
+SELECT c.nombre AS cine, s.cod_sala AS sala,
+       ROUND(AVG(v.vendidas * 100.0 / s.cant_butacas), 1) AS ocupacion_pct
+FROM funciones f
+JOIN salas s ON s.idsala = f.sala
+JOIN cines c ON c.idcine = s.cine
+JOIN (SELECT funcion, COUNT(*) AS vendidas
+      FROM entradas
+      GROUP BY funcion) v ON v.funcion = f.idfuncion
+WHERE f.hora = TIME '20:00'
+  AND f.fecha BETWEEN DATE '2026-03-01' AND DATE '2026-03-31'
+GROUP BY c.nombre, s.cod_sala
+ORDER BY ocupacion_pct DESC;
+```
+
+</div>
+
+| Cine | Sala | Ocupación (%) |
+| --- | --- | --- |
+| Tu Cine Shopping | 3 | 35,7 |
+| Tu Cine Centro | 1 | 33,4 |
+| Tu Cine Shopping | 1 | 33,3 |
+| … | … | … |
+
+La consulta es idéntica en ambos motores. Es correcta y el resultado se obtuvo en segundos. Sin embargo, la primera fila merece una segunda mirada: ¿la sala 3 del Shopping tiene realmente más público, o hay otra explicación? Quien conoce el modelo sabe que `cant_butacas` es una **columna calculada**, y que si su valor no coincide con la cantidad real de butacas, el porcentaje queda distorsionado. En la base de ejemplo, efectivamente, esa sala registra 140 butacas cuando tiene 150. El capítulo 6 retoma este caso.
+
+<Recuadro tipo="nota">
+El ejemplo ilustra la idea central de esta guía: el agente escribe la consulta, pero **decidir si el resultado tiene sentido sigue siendo responsabilidad de quien conoce el modelo de datos**. Por eso se le pide siempre la consulta utilizada.
+</Recuadro>
+
+<Seccion n="1.3" id="que-cambia">Qué cambia y qué no</Seccion>
+
+| El agente acelera | Sigue siendo responsabilidad humana |
+| --- | --- |
+| Explorar un esquema desconocido y describirlo | Validar que la descripción sea correcta |
+| Escribir consultas a partir de una pregunta | Verificar que la consulta responda la pregunta formulada |
+| Detectar datos que violan una regla | Definir cuáles son las reglas del negocio |
+| Proponer índices y comparar planes de ejecución | Decidir qué cambios se aplican y cuándo |
+| Redactar scripts de cambios de esquema | Revisar, versionar y ejecutar esos scripts |
+
+Lejos de volver innecesario el conocimiento de SQL, el trabajo con agentes lo vuelve más importante: una consulta incorrecta escrita por un agente se ejecuta sin errores y devuelve un número verosímil. Solo quien sabe leer SQL puede advertirlo. El capítulo 7 analiza este riesgo en detalle.
+
+<Seccion n="1.4" id="alcance">Alcance y requisitos</Seccion>
+
+La guía cubre la conexión de bases de datos **PostgreSQL y MySQL**, locales o en la nube, a agentes de IA mediante el *Model Context Protocol* (MCP) y, alternativamente, mediante la terminal. Se requiere:
+
+- Un motor de base de datos instalado localmente, o una cuenta en un servicio de base de datos en la nube.
+- Node.js 22.5 o superior, necesario para ejecutar el servidor MCP recomendado.
+- Al menos uno de los clientes tratados: Claude Code, Codex, OpenCode, Cursor, la aplicación de escritorio de Claude o ChatGPT. Algunos requieren una suscripción paga.
+- Conocimientos de SQL a nivel de la asignatura: restricciones, reuniones, agregaciones, usuarios y privilegios.
+
+<Nota>
+**Verificación.** Las instrucciones de configuración de cada cliente y servidor fueron verificadas en septiembre de 2026. Estas herramientas cambian con frecuencia; ante una discrepancia, prevalece la documentación oficial.
+</Nota>
+
+La guía no cubre el desarrollo de aplicaciones con agentes ni la construcción de servidores MCP propios.
+
+<Seccion n="1.5" id="como-leer">Cómo leer esta guía</Seccion>
+
+Los capítulos 2 y 3 son conceptuales y conviene leerlos en orden: el capítulo 3, en particular, debe completarse **antes** de conectar un agente a cualquier base. Los capítulos 4 y 5 son de consulta: cada lector sigue solo la parte que corresponde a su cliente y su motor. El capítulo 6 reúne los casos de uso y el 8 propone una práctica integradora.
+
+Se utilizan las siguientes convenciones:
+
+- **Selectores de motor y cliente.** La barra superior permite elegir PostgreSQL o MySQL y el cliente utilizado. Todo el contenido que depende del motor o del cliente (comandos, configuraciones, pasos y avisos de aplicabilidad) se adapta a esa elección, que se recuerda entre visitas. Las pestañas que acompañan a esos contenidos cambian la misma preferencia.
+- **Bloques de código.** Contienen comandos, configuraciones o SQL, y pueden copiarse con el botón «Copiar».
+- **Prompts para el agente.** Se presentan en un recuadro propio. Son textos sugeridos para enviar al agente; pueden adaptarse libremente.
+- **Valores a completar.** Aparecen resaltados entre ‹ y ›, por ejemplo ‹CONTRASEÑA›, y deben reemplazarse antes de usar el texto.

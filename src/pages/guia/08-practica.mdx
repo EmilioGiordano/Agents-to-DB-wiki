@@ -1,0 +1,110 @@
+---
+layout: ../../layouts/Guide.astro
+num: '8'
+titulo: Práctica guiada
+lede: Esta práctica integra los contenidos de la guía en una secuencia de trabajo completa sobre la base Tu Cine, desde la preparación del acceso hasta el análisis de rendimiento. Puede realizarse con cualquiera de los dos motores y con cualquiera de los clientes tratados.
+secciones:
+  - { n: '8.1', id: 'consigna', titulo: 'Consigna' }
+  - { n: '8.2', id: 'etapa-1', titulo: 'Preparación' }
+  - { n: '8.3', id: 'etapa-2', titulo: 'Conexión' }
+  - { n: '8.4', id: 'etapa-3', titulo: 'Exploración' }
+  - { n: '8.5', id: 'etapa-4', titulo: 'Reglas de negocio' }
+  - { n: '8.6', id: 'etapa-5', titulo: 'Rendimiento' }
+  - { n: '8.7', id: 'entrega', titulo: 'Entrega y evaluación' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Prompt from '../../components/Prompt.astro';
+import Cliente from '../../components/Cliente.astro';
+
+<Objetivos>
+- Configurar de punta a punta el acceso controlado de un agente a una base de datos.
+- Utilizar el agente para explorar datos, validar reglas y analizar rendimiento.
+- Verificar de manera independiente cada conclusión del agente y documentar el proceso.
+</Objetivos>
+
+<Seccion n="8.1" id="consigna">Consigna</Seccion>
+
+La cadena *Tu Cine* incorporó un agente de IA para asistir al equipo de sistemas. Antes de habilitarlo sobre la base real, se solicita una prueba de concepto sobre una copia local, con el objetivo de responder tres preguntas: ¿es posible dar acceso al agente sin riesgo de modificaciones?, ¿detecta el agente problemas de calidad de datos que el equipo desconoce?, y ¿sus recomendaciones de rendimiento son correctas?
+
+La práctica se organiza en cinco etapas. En cada una se indica qué hacer, qué registrar y qué verificar por cuenta propia. **Toda afirmación del agente que se incluya en la entrega debe estar acompañada de la consulta que la sustenta y de una verificación independiente.**
+
+<Recuadro tipo="nota" titulo="modalidad">
+Se sugiere trabajar en parejas: una persona conduce la interacción con el agente y la otra verifica en paralelo con un cliente SQL tradicional (psql, pgAdmin, MySQL Workbench o DBeaver). Los roles se alternan en cada etapa.
+</Recuadro>
+
+<Seccion n="8.2" id="etapa-1">Etapa 1: preparación del acceso</Seccion>
+
+1. Crear la base `cadena_cines` y cargarla con el script del [apéndice A](../a-bases-de-ejemplo/).
+2. Crear el usuario `agente_lectura` según la sección 3.3.
+3. Reproducir los tres recorridos de la figura 3.1 y registrar el mensaje obtenido en cada uno.
+
+**Registrar:** el script ejecutado y los tres mensajes de error. **Verificar:** que una consulta `SELECT` sobre cada tabla funcione con el nuevo usuario.
+
+<Seccion n="8.3" id="etapa-2">Etapa 2: conexión del agente</Seccion>
+
+<Cliente ids="claude-code codex opencode cursor">
+
+1. Configurar DBHub y registrarlo en el cliente, según el capítulo 4. Alternativamente, configurar el acceso por terminal según el capítulo 5.
+2. Pedir al agente la verificación de la sección 4.6.
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+1. Configurar DBHub y registrarlo en la aplicación de escritorio de Claude, según el capítulo 4. La versión web no puede acceder a la base local.
+2. Pedir al agente la verificación de la sección 4.6.
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+1. ChatGPT no puede acceder a una base local. Crear una base en un servicio en la nube (por ejemplo, Neon o Supabase), cargar en ella el script de *Tu Cine* con `psql` y la cadena de conexión del servicio, y registrar el servidor MCP remoto del servicio en modo de solo lectura, según la sección 4.5. En este caso, las etapas 1 y 5 se realizan sobre la base en la nube, con el usuario administrador del servicio.
+2. Pedir al agente la verificación de la sección 4.6.
+
+</Cliente>
+
+**Registrar:** los archivos de configuración creados, sin la contraseña, y la respuesta del agente al intento de borrado. **Verificar:** que ningún archivo del proyecto contenga la contraseña (por ejemplo, buscándola con la función de búsqueda del editor).
+
+<Seccion n="8.4" id="etapa-3">Etapa 3: exploración</Seccion>
+
+<Prompt>
+Describa la base de datos a la que está conectado: qué representa cada tabla, cómo se relacionan y qué volumen de datos tiene cada una. Presente la descripción como si fuera la documentación para una persona que se incorpora al equipo, e incluya un diagrama de relaciones en texto.
+</Prompt>
+
+**Registrar:** la descripción obtenida. **Verificar:** comparar la descripción con el script de creación y señalar cualquier inexactitud. Luego formular al agente tres preguntas de negocio propias (por ejemplo, la película con mayor recaudación por cine o el horario con mayor ocupación) y verificar cada respuesta con una consulta escrita a mano.
+
+<Seccion n="8.5" id="etapa-4">Etapa 4: reglas de negocio y calidad de datos</Seccion>
+
+<Prompt>
+Proponga al menos cinco reglas de negocio razonables para esta base que el esquema no garantice mediante restricciones. Para cada una, escriba y ejecute una consulta que detecte violaciones. Además, verifique que las columnas calculadas coincidan con los valores que representan. Presente los hallazgos en una tabla con la regla, la consulta, la cantidad de violaciones y una propuesta de restricción o disparador que la garantice.
+</Prompt>
+
+**Registrar:** la tabla de hallazgos. **Verificar:** las inconsistencias intencionales de la base se analizan en los capítulos 1 y 6. El agente, que no tiene acceso a la guía, debe encontrarlas por su cuenta: comprobar si las encontró todas, si informó otras, y ejecutar por cuenta propia la consulta de cada hallazgo. Para cada propuesta de restricción, indicar si podría aplicarse con los datos actuales o si requiere antes una corrección de datos, y quién debería decidir esa corrección.
+
+<Seccion n="8.6" id="etapa-5">Etapa 5: rendimiento</Seccion>
+
+<Prompt>
+Identifique las tres consultas más probables en la operación diaria de un cine (por ejemplo, ventas de un día o disponibilidad de butacas de una función). Para cada una, obtenga el plan de ejecución, explíquelo y proponga los índices que lo mejorarían, con su costo estimado. No cree ningún índice.
+</Prompt>
+
+**Registrar:** los planes y las propuestas. **Verificar:** crear, con el usuario administrador y sobre la base local, uno de los índices propuestos; volver a obtener el plan y comparar los tiempos. Indicar si la mejora coincide con la anticipada por el agente.
+
+<Recuadro tipo="nota" titulo="extensión opcional">
+Organizar los cambios propuestos en las etapas 4 y 5 según la sección 6.6: un script de cambios idempotente y un archivo de pruebas, versionados con Git en una rama propia, y comprobar que el script puede ejecutarse dos veces seguidas sin error.
+</Recuadro>
+
+<Seccion n="8.7" id="entrega">Entrega y criterios de evaluación</Seccion>
+
+La entrega consiste en un informe breve con los registros de cada etapa y una conclusión fundada sobre las tres preguntas de la consigna.
+
+| Criterio | Se considera logrado cuando |
+| --- | --- |
+| Seguridad del acceso | El agente no puede modificar datos y se demuestra con los mensajes de error correspondientes |
+| Manejo de credenciales | Ninguna contraseña figura en archivos del proyecto ni en la conversación con el agente |
+| Verificación | Cada afirmación del agente incluida en el informe tiene su consulta y una verificación independiente |
+| Calidad de datos | Se identifican las inconsistencias intencionales y se distingue la corrección técnica de la decisión de negocio |
+| Rendimiento | La comparación de planes es correcta y la conclusión se apoya en mediciones propias |
+| Juicio crítico | El informe señala al menos un error, omisión o supuesto discutible del agente |

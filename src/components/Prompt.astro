@@ -1,0 +1,10 @@
+---
+interface Props { titulo?: string }
+const { titulo } = Astro.props;
+---
+<div class="prompt">
+  <div class="prompt__bar">
+    <span><strong>Prompt para el agente</strong>{titulo && <>: {titulo}</>}</span>
+  </div>
+  <div class="prompt__body"><slot /></div>
+</div>

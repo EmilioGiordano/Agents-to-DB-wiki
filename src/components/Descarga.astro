@@ -1,0 +1,9 @@
+---
+import { url } from '../lib/url';
+interface Props { href: string; nombre: string; detalle?: string }
+const { href, nombre, detalle } = Astro.props;
+---
+<a class="download" href={url(href)} download>
+  <span class="download__name">{nombre}</span>
+  {detalle && <span class="download__meta">{detalle}</span>}
+</a>

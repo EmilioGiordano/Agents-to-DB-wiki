@@ -1,0 +1,73 @@
+---
+import '../styles/global.css';
+import { clientes } from '../data/toc';
+import { url } from '../lib/url';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = 'Guía complementaria de Laboratorio de Bases de Datos sobre la conexión de agentes de IA a bases de datos SQL.' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href={url('/favicon.svg')} type="image/svg+xml" />
+    <script is:inline>
+      // Aplica las preferencias guardadas antes del primer pintado para evitar
+      // que se vea, por un instante, la variante equivocada.
+      (function () {
+        var d = document.documentElement;
+        function get(k) {
+          try { return localStorage.getItem(k); } catch (e) { return null; }
+        }
+        d.dataset.engine = get('guia.engine') || 'postgresql';
+        d.dataset.client = get('guia.client') || 'claude-code';
+        var accent = get('guia.accent');
+        if (accent) d.dataset.accent = accent;
+        var theme = get('guia.theme');
+        if (theme) d.dataset.theme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__inner">
+        <a class="topbar__title" href={url('/')}>
+          Agentes de IA y bases de datos
+          <span>Material complementario de Laboratorio de Bases de Datos</span>
+        </a>
+        <div class="prefs">
+          <div class="pref">
+            <span id="lbl-motor">Motor</span>
+            <div class="seg" role="group" aria-labelledby="lbl-motor">
+              <button type="button" data-set-engine="postgresql">PostgreSQL</button>
+              <button type="button" data-set-engine="mysql">MySQL</button>
+            </div>
+          </div>
+          <label class="pref">
+            Cliente
+            <select id="sel-client">
+              {clientes.map((c) => <option value={c.id}>{c.nombre}</option>)}
+            </select>
+          </label>
+          <button type="button" class="icon-btn" id="btn-theme" aria-label="Cambiar tema">Tema</button>
+        </div>
+      </div>
+    </header>
+
+    <slot />
+
+    <script>
+      import { initPrefs } from '../scripts/prefs';
+      import { enhanceCode } from '../scripts/code';
+      initPrefs();
+      enhanceCode();
+    </script>
+  </body>
+</html>

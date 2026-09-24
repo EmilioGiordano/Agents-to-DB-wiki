@@ -1,0 +1,53 @@
+---
+layout: ../../layouts/Guide.astro
+num: 'B'
+titulo: Lista de control
+lede: Verificaciones mínimas antes de conectar un agente a una base de datos. Las casillas marcadas se recuerdan en este navegador, de modo que la lista puede completarse en varias sesiones.
+---
+import ListaControl from '../../components/ListaControl.astro';
+import Recuadro from '../../components/Recuadro.astro';
+
+<ListaControl
+  id="antes-de-conectar"
+  grupos={[
+    {
+      titulo: 'Acceso',
+      items: [
+        'El agente se conecta con un usuario propio, distinto del administrador (sección 3.3).',
+        'El usuario tiene únicamente privilegios de lectura, y se comprobó que un <code>DELETE</code> es rechazado (sección 3.4).',
+        'En PostgreSQL, el usuario tiene un <code>statement_timeout</code> configurado.',
+        'Las columnas con datos personales están excluidas mediante vistas o privilegios por columna (sección 3.5).',
+        'Si la base es compartida o de producción, se cuenta con autorización de quien la administra.',
+      ],
+    },
+    {
+      titulo: 'Credenciales',
+      items: [
+        'La contraseña está en una variable de entorno o en un archivo de credenciales del usuario, no en archivos del proyecto (sección 3.6).',
+        'Ningún archivo versionado contiene la contraseña ni la cadena de conexión completa.',
+        'La contraseña no se escribió en la conversación con el agente.',
+      ],
+    },
+    {
+      titulo: 'Servidor y cliente',
+      items: [
+        'El servidor MCP es una versión actual y mantenida; no se utiliza el servidor de referencia archivado (sección 4.1).',
+        'El servidor está configurado en modo de solo lectura y con un límite de filas (sección 4.3).',
+        'El cliente solicita aprobación antes de ejecutar herramientas o comandos.',
+        'Se ejecutó la verificación de la sección 4.6 y el intento de borrado falló.',
+      ],
+    },
+    {
+      titulo: 'Durante el trabajo',
+      items: [
+        'Se pide al agente la consulta utilizada en cada respuesta (sección 7.6).',
+        'Los resultados relevantes se verifican con una consulta independiente.',
+        'Los cambios de estructura se prueban en una base local reconstruible y se versionan en el repositorio (sección 6.6).',
+      ],
+    },
+  ]}
+/>
+
+<Recuadro tipo="nota">
+La lista se guarda únicamente en este navegador. Si se utiliza otro equipo o se borran los datos de navegación, las casillas aparecen sin marcar.
+</Recuadro>

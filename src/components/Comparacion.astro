@@ -1,0 +1,14 @@
+---
+interface Props { izquierda: string; derecha: string }
+const { izquierda, derecha } = Astro.props;
+---
+<div class="compare">
+  <div class="compare__col">
+    <p class="compare__label">{izquierda}</p>
+    <slot name="antes" />
+  </div>
+  <div class="compare__col">
+    <p class="compare__label">{derecha}</p>
+    <slot name="despues" />
+  </div>
+</div>

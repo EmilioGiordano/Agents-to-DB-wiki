@@ -1,0 +1,207 @@
+---
+// Página de revisión: paleta, tipografía y color de acento. No forma parte de la guía.
+import Base from '../layouts/Base.astro';
+import { url } from '../lib/url';
+
+const base = [
+  { v: '--paper', n: 'Papel', uso: 'Fondo general' },
+  { v: '--paper-2', n: 'Papel 2', uso: 'Código, índice, superficies' },
+  { v: '--ink', n: 'Tinta', uso: 'Texto principal' },
+  { v: '--ink-2', n: 'Tinta 2', uso: 'Texto secundario, epígrafes' },
+  { v: '--rule', n: 'Filete', uso: 'Líneas y bordes' },
+];
+const semanticos = [
+  { v: '--accent', n: 'Acento', uso: 'Enlaces, numeración, notas' },
+  { v: '--warn', n: 'Ocre', uso: 'Advertencias, rechazos' },
+  { v: '--ok', n: 'Oliva', uso: 'Buenas prácticas, confirmaciones' },
+];
+---
+
+<Base title="Revisión de estilo | Agentes de IA y bases de datos">
+  <main class="spec">
+    <p class="spec__kicker">Página de revisión, no forma parte de la guía</p>
+    <h1>Estilo de la guía</h1>
+    <p class="spec__lede">
+      Referencia visual para validar paleta, tipografía y color de acento. Los colores se muestran según el tema activo;
+      el botón «Tema» de la barra superior alterna entre claro y oscuro.
+    </p>
+
+    <section>
+      <h2>Color de acento</h2>
+      <p>Es el único color con presencia propia. Se usa con moderación: enlaces, numeración de secciones, notas y el límite de seguridad en las figuras.</p>
+      <div class="seg" role="group" aria-label="Color de acento">
+        <button type="button" data-set-accent="azul">Azul institucional</button>
+        <button type="button" data-set-accent="bordo">Bordó</button>
+      </div>
+      <p class="spec__hint">La elección se aplica a todo el sitio; puede verse su efecto en el <a href={url('/guia/03-seguridad/')}>capítulo 3</a>.</p>
+    </section>
+
+    <section>
+      <h2>Paleta</h2>
+      <div class="swatches">
+        {[...base, ...semanticos].map((c) => (
+          <div class="sw">
+            <div class="sw__chip" style={`background: var(${c.v})`}></div>
+            <div class="sw__name">{c.n}</div>
+            <div class="sw__hex" data-var={c.v}></div>
+            <div class="sw__use">{c.uso}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section>
+      <h2>Tipografía</h2>
+      <div class="type">
+        <div class="type__row">
+          <div class="type__meta">Literata<br />Texto y títulos</div>
+          <div>
+            <p class="t-h1">Seguridad y acceso</p>
+            <p class="t-body">
+              Un agente de IA conectado a una base de datos ejecuta sentencias SQL a partir de instrucciones en lenguaje
+              natural. La traducción de una instrucción a SQL no siempre es la que el usuario tenía en mente.
+            </p>
+          </div>
+        </div>
+        <div class="type__row">
+          <div class="type__meta">Public Sans<br />Interfaz, epígrafes, notas</div>
+          <p class="t-sans"><b>Figura 3.1.</b> Recorrido de tres sentencias emitidas por un agente conectado como agente_lectura.</p>
+        </div>
+        <div class="type__row">
+          <div class="type__meta">IBM Plex Mono<br />Código</div>
+          <p class="t-mono">GRANT SELECT ON ALL TABLES IN SCHEMA public TO agente_lectura;</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Criterios</h2>
+      <ul>
+        <li>Una sola familia serif para leer; la sans queda reservada a la interfaz y los textos auxiliares.</li>
+        <li>Los prompts se componen en serif porque son prosa; los comandos, en monoespaciada porque son código.</li>
+        <li>Numeración solo donde hay secuencia real: capítulos, secciones, figuras y pasos de un script.</li>
+        <li>Sin degradados, sombras ni íconos decorativos. La jerarquía se construye con tipografía, filetes y espacio.</li>
+        <li>Las figuras son esquemas técnicos que muestran un mecanismo concreto, con epígrafe numerado.</li>
+      </ul>
+    </section>
+  </main>
+</Base>
+
+<style>
+  .spec {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+  }
+  .spec__kicker,
+  .spec__hint {
+    font-family: var(--sans);
+    font-size: 0.875rem;
+    color: var(--ink-2);
+  }
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 0.25rem 0 1rem;
+  }
+  .spec__lede {
+    color: var(--ink-2);
+    font-size: 1.125rem;
+    max-width: 40rem;
+  }
+  section {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1.5px solid var(--ink);
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+  }
+  section > p {
+    max-width: 40rem;
+  }
+  .seg {
+    font-family: var(--sans);
+    font-size: 0.9375rem;
+  }
+  .seg button {
+    padding: 0.5rem 1rem;
+  }
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 1.25rem 1rem;
+    font-family: var(--sans);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+  .sw__chip {
+    height: 4rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+  }
+  .sw__name {
+    font-weight: 600;
+  }
+  .sw__hex {
+    font-family: var(--mono);
+    color: var(--ink-2);
+  }
+  .sw__use {
+    color: var(--ink-2);
+  }
+  .type__row {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 1.5rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .type__meta {
+    font-family: var(--sans);
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+  .type p {
+    margin: 0;
+  }
+  .t-h1 {
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 0.75rem !important;
+  }
+  .t-body {
+    max-width: 36rem;
+  }
+  .t-sans {
+    font-family: var(--sans);
+    font-size: 0.9375rem;
+  }
+  .t-mono {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+  }
+  @media (max-width: 640px) {
+    .type__row {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  }
+</style>
+
+<script>
+  function paintHex() {
+    const cs = getComputedStyle(document.documentElement);
+    document.querySelectorAll<HTMLElement>('.sw__hex').forEach((el) => {
+      el.textContent = cs.getPropertyValue(el.dataset.var!).trim();
+    });
+  }
+  paintHex();
+  new MutationObserver(paintHex).observe(document.documentElement, { attributes: true });
+</script>

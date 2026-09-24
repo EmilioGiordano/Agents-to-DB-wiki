@@ -1,0 +1,583 @@
+---
+layout: ../../layouts/Guide.astro
+num: '6'
+titulo: Casos de uso
+lede: Con el agente conectado, este capítulo recorre los usos más frecuentes en un ámbito profesional. Cada caso incluye un prompt de ejemplo, lo que cabe esperar del agente y las consultas que permiten verificar su trabajo. Todos se basan en las bases del apéndice A.
+secciones:
+  - { n: '6.1', id: 'consultas', titulo: 'Consultas en lenguaje natural' }
+  - { n: '6.2', id: 'reglas', titulo: 'Reglas de negocio' }
+  - { n: '6.3', id: 'modelo', titulo: 'Revisión del modelo' }
+  - { n: '6.4', id: 'calculadas', titulo: 'Columnas calculadas' }
+  - { n: '6.5', id: 'rendimiento', titulo: 'Rendimiento y mantenimiento' }
+  - { n: '6.6', id: 'versionado', titulo: 'Versionado de la base' }
+  - { n: '6.7', id: 'desarrollo', titulo: 'Base y código' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Prompt from '../../components/Prompt.astro';
+import PorMotor from '../../components/PorMotor.astro';
+import Motor from '../../components/Motor.astro';
+import Figura from '../../components/Figura.astro';
+import Comparacion from '../../components/Comparacion.astro';
+import VersionadoBD from '../../components/figuras/VersionadoBD.astro';
+import PorCliente from '../../components/PorCliente.astro';
+import Cliente from '../../components/Cliente.astro';
+
+<Objetivos>
+- Utilizar un agente para explorar datos, validar reglas de negocio y revisar un modelo relacional.
+- Analizar con un agente el efecto de un índice sobre el plan de ejecución de una consulta.
+- Versionar la estructura de la base junto al código, de modo que el agente pueda reconstruir y comparar sus estados.
+- Verificar, mediante consultas propias, las conclusiones del agente.
+</Objetivos>
+
+<Seccion n="6.1" id="consultas">Consultas en lenguaje natural</Seccion>
+
+El uso más inmediato es formular preguntas sobre los datos. El agente explora el esquema, escribe la consulta, la ejecuta y presenta el resultado.
+
+<Prompt>
+¿Cuáles fueron las tres películas que más recaudaron en marzo de 2026, considerando todos los cines? Indique cantidad de entradas y recaudación de cada una, y muéstreme la consulta utilizada.
+</Prompt>
+
+<PorMotor>
+<Motor id="postgresql" titulo="Consulta esperada (PostgreSQL)">
+
+```sql
+SELECT p.titulo, COUNT(*) AS entradas, SUM(e.importe) AS recaudacion
+FROM entradas e
+JOIN funciones f ON f.idfuncion = e.funcion
+JOIN peliculas p ON p.idpelicula = f.pelicula
+WHERE f.fecha >= DATE '2026-03-01' AND f.fecha < DATE '2026-04-01'
+GROUP BY p.titulo
+ORDER BY recaudacion DESC
+FETCH FIRST 3 ROWS ONLY;
+```
+
+</Motor>
+<Motor id="mysql" titulo="Consulta esperada (MySQL)">
+
+```sql
+SELECT p.titulo, COUNT(*) AS entradas, SUM(e.importe) AS recaudacion
+FROM entradas e
+JOIN funciones f ON f.idfuncion = e.funcion
+JOIN peliculas p ON p.idpelicula = f.pelicula
+WHERE f.fecha >= DATE '2026-03-01' AND f.fecha < DATE '2026-04-01'
+GROUP BY p.titulo
+ORDER BY recaudacion DESC
+LIMIT 3;
+```
+
+</Motor>
+</PorMotor>
+
+<Nota>
+**`FETCH FIRST` y `LIMIT`.** La cláusula `FETCH FIRST n ROWS ONLY` es la forma estándar de limitar filas y la admite PostgreSQL. MySQL solo admite `LIMIT`, que PostgreSQL también acepta.
+</Nota>
+
+Conviene revisar dos aspectos de la consulta propuesta: que el filtro de fechas use la fecha de la **función** y no la de venta (la pregunta es ambigua, y el agente debería explicitar su interpretación), y que el rango de fechas sea semiabierto, para no perder las funciones del último día.
+
+### Cruce de información entre bases
+
+<Cliente ids="chatgpt claude-desktop">
+<Recuadro tipo="nota" titulo="cliente seleccionado">
+Este ejemplo usa DBHub como servidor local, disponible en la aplicación de escritorio de Claude pero no en ChatGPT ni en la versión web de Claude. Con esos clientes, el cruce entre bases requiere registrar un servidor remoto por cada base y pedir al agente que consulte ambos.
+</Recuadro>
+</Cliente>
+
+Un mismo servidor MCP puede conectarse a varias bases. Un caso frecuente es validar una migración entre motores: comprobar que los datos cargados en MySQL coinciden con los de PostgreSQL. Basta con declarar dos fuentes en `dbhub.toml`; DBHub crea entonces una herramienta por fuente, llamadas `execute_sql_cine_pg` y `execute_sql_cine_mysql`:
+
+```toml
+[[sources]]
+id = "cine_pg"
+dsn = "${DB_PG_URL}"
+
+[[sources]]
+id = "cine_mysql"
+dsn = "${DB_MYSQL_URL}"
+
+[[tools]]
+name = "execute_sql"
+source = "cine_pg"
+readonly = true
+max_rows = 200
+
+[[tools]]
+name = "execute_sql"
+source = "cine_mysql"
+readonly = true
+max_rows = 200
+```
+
+<Prompt titulo="comparar dos bases">
+Las fuentes cine_pg y cine_mysql deberían contener los mismos datos. Compare, tabla por tabla, la cantidad de filas y la suma de las columnas numéricas en ambas fuentes, excluyendo las claves generadas automáticamente, que pueden diferir entre motores. Informe cualquier diferencia en una tabla.
+</Prompt>
+
+<Seccion n="6.2" id="reglas">Validación de reglas de negocio</Seccion>
+
+Las reglas de negocio pueden estar **explícitas** en el esquema, como restricciones `CHECK`, claves únicas, claves foráneas o disparadores, o ser **implícitas**: se cumplen porque la aplicación o las personas las respetan, pero nada en la base lo garantiza. Un agente puede ayudar en ambos casos.
+
+Para las reglas explícitas, el agente lista y explica las restricciones a partir del catálogo. Para las implícitas, el aporte es mayor: puede **proponer** reglas razonables a partir del significado de las tablas y verificar si los datos las cumplen.
+
+<Prompt titulo="reglas implícitas">
+Analice el esquema de la base. Proponga reglas de negocio que sean razonables para un cine pero que el esquema no garantice mediante restricciones. Para cada regla, escriba una consulta que detecte las filas que la violan, ejecútela e informe cuántas violaciones encontró. No proponga todavía cambios en el esquema.
+</Prompt>
+
+En *Tu Cine*, un agente competente debería encontrar, entre otras, las dos reglas siguientes, además de la inconsistencia de `cant_butacas` ya comentada en el capítulo 1. Ambas consultas son SQL estándar y se ejecutan igual en los dos motores:
+
+```sql
+-- Regla 1: la butaca de una entrada debe pertenecer a la sala de la función
+SELECT e.identrada, b.sala AS sala_butaca, f.sala AS sala_funcion
+FROM entradas e
+JOIN butacas b ON b.idbutaca = e.butaca
+JOIN funciones f ON f.idfuncion = e.funcion
+WHERE b.sala <> f.sala;
+
+-- Regla 2: una sala no puede tener dos funciones en la misma fecha y hora
+SELECT sala, fecha, hora, COUNT(*) AS funciones
+FROM funciones
+GROUP BY sala, fecha, hora
+HAVING COUNT(*) > 1;
+```
+
+Cada consulta devuelve una fila en la base de ejemplo. La segunda regla ilustra un defecto de diseño frecuente: la clave única `(fecha, hora, pelicula, sala)` impide repetir la misma película, pero permite dos películas distintas en la misma sala y horario.
+
+<Cliente ids="chatgpt claude-desktop">
+<Recuadro tipo="nota" titulo="cliente seleccionado">
+El contraste entre la base y el código de la aplicación requiere que el agente pueda leer el repositorio. La aplicación de escritorio de Claude, la versión web y ChatGPT no tienen acceso a los archivos del proyecto, salvo que se les adjunten.
+</Recuadro>
+</Cliente>
+
+<Recuadro tipo="nota" titulo="reglas en el código">
+En una aplicación real, muchas reglas se validan en el código y no en la base. Si el agente trabaja en el repositorio de la aplicación, puede contrastar ambos: identificar qué reglas valida el código, cuáles garantiza la base y cuáles no garantiza ninguno. Es una revisión especialmente valiosa, porque los datos cargados por otras vías (scripts, importaciones, otras aplicaciones) no pasan por las validaciones del código.
+</Recuadro>
+
+<Seccion n="6.3" id="modelo">Revisión del modelo</Seccion>
+
+Un agente puede revisar un modelo relacional con criterios conocidos: claves primarias, claves foráneas, restricciones de dominio, normalización y consistencia de nombres. El caso *Gimnasio* reproduce algunas decisiones discutibles, adecuadas para este ejercicio.
+
+<Prompt titulo="revisión del modelo">
+Revise el modelo de la base gimnasio como lo haría un docente de bases de datos. Para cada problema indique la tabla, el problema, por qué es un problema, una consulta que muestre si los datos actuales ya lo evidencian, y la corrección propuesta en SQL. Ordene los problemas por gravedad. No ejecute ninguna corrección.
+</Prompt>
+
+Una revisión adecuada debería señalar, al menos, los siguientes puntos:
+
+| Tabla | Problema | Evidencia en los datos |
+| --- | --- | --- |
+| `titulos`, `jornadas_laborales` | No tienen clave primaria | Hay dos títulos con el mismo `id_titulo` |
+| `es_jefe` | La clave foránea `jefe` referencia a `personas` y no a `entrenadores` | Un cliente figura como jefe de un entrenador |
+| `jornadas_laborales` | No se garantiza que `hora_fin` sea posterior a `hora_inicio` | Una jornada termina antes de empezar |
+| `personas` | El DNI no es único | Dos personas comparten DNI |
+
+Las tablas sin clave primaria pueden detectarse con el catálogo estándar `information_schema`, disponible en ambos motores:
+
+<PorMotor>
+<Motor id="postgresql" titulo="Tablas sin clave primaria (PostgreSQL)">
+
+```sql
+SELECT t.table_name
+FROM information_schema.tables t
+WHERE t.table_schema = 'public'
+  AND t.table_type = 'BASE TABLE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM information_schema.table_constraints c
+      WHERE c.table_schema = t.table_schema
+        AND c.table_name = t.table_name
+        AND c.constraint_type = 'PRIMARY KEY')
+ORDER BY t.table_name;
+```
+
+</Motor>
+<Motor id="mysql" titulo="Tablas sin clave primaria (MySQL)">
+
+```sql
+SELECT t.table_name
+FROM information_schema.tables t
+WHERE t.table_schema = DATABASE()
+  AND t.table_type = 'BASE TABLE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM information_schema.table_constraints c
+      WHERE c.table_schema = t.table_schema
+        AND c.table_name = t.table_name
+        AND c.constraint_type = 'PRIMARY KEY')
+ORDER BY t.table_name;
+```
+
+</Motor>
+</PorMotor>
+
+<Recuadro tipo="advertencia">
+Algunas correcciones propuestas por el agente no pueden aplicarse directamente, porque los datos actuales las violan: agregar una restricción de unicidad sobre el DNI fallará mientras existan dos personas con el mismo número. Decidir qué hacer con esos datos (corregirlos, depurarlos o consultar al área que los cargó) es una decisión de negocio, no técnica.
+</Recuadro>
+
+<Seccion n="6.4" id="calculadas">Columnas calculadas y disparadores</Seccion>
+
+Una columna calculada almacena un valor que podría obtenerse a partir de otros datos, como el total de un pedido o la cantidad de butacas de una sala. Su riesgo es la inconsistencia: si el mecanismo que la mantiene tiene un defecto, el valor almacenado deja de coincidir con el real. En la base *Heladería*, la columna `pedidos.total` se mantiene mediante un disparador.
+
+<Prompt titulo="consistencia de una columna calculada">
+En la base heladeria, la columna pedidos.total debería ser igual a la suma de cantidad por precio_unitario de sus renglones en contiene. Verifique si eso se cumple para todos los pedidos. Si encuentra diferencias, analice el disparador que mantiene la columna y explique qué operaciones podrían haberlas causado.
+</Prompt>
+
+La verificación es una consulta estándar:
+
+```sql
+SELECT p.idpedido, p.total,
+       SUM(c.cantidad * c.precio_unitario) AS total_calculado
+FROM pedidos p
+JOIN contiene c ON c.pedido = p.idpedido
+GROUP BY p.idpedido, p.total
+HAVING p.total <> SUM(c.cantidad * c.precio_unitario);
+```
+
+La consulta devuelve dos pedidos. Al analizar el disparador, el agente debería advertir que solo se ejecuta **después de un `INSERT`** en `contiene`: una modificación de la cantidad de un renglón o su eliminación no actualizan el total. Esa es la explicación de una de las diferencias; la otra corresponde a una modificación directa del total, que ningún disparador sobre `contiene` puede evitar. El caso de `salas.cant_butacas` en *Tu Cine*, mencionado en el capítulo 1, es análogo.
+
+<Seccion n="6.5" id="rendimiento">Rendimiento y mantenimiento</Seccion>
+
+### Índices y planes de ejecución
+
+El agente puede leer planes de ejecución, identificar recorridos secuenciales costosos y proponer índices. En *Tu Cine*, la consulta de ventas de un día recorre las 144 000 entradas:
+
+```sql
+SELECT COUNT(*), SUM(importe)
+FROM entradas
+WHERE fecha_venta >= TIMESTAMP '2026-04-10 00:00:00'
+  AND fecha_venta <  TIMESTAMP '2026-04-11 00:00:00';
+```
+
+<PorMotor>
+<Motor id="postgresql" titulo="PostgreSQL">
+
+<Comparacion izquierda="Sin índice" derecha="Con índice sobre fecha_venta">
+<div slot="antes" data-code-title="EXPLAIN (ANALYZE)">
+
+```text
+Aggregate (actual time=13.79..13.80 rows=1)
+  ->  Seq Scan on entradas
+        (actual time=7.25..12.42 rows=2400)
+        Filter: ((fecha_venta >= ...) AND
+                 (fecha_venta < ...))
+        Rows Removed by Filter: 141601
+Execution Time: 13.889 ms
+```
+
+</div>
+<div slot="despues" data-code-title="EXPLAIN (ANALYZE)">
+
+```text
+Aggregate (actual time=4.14..4.14 rows=1)
+  ->  Index Scan using idx_entradas_fecha_venta
+        on entradas
+        (actual time=0.03..2.59 rows=2400)
+        Index Cond: ((fecha_venta >= ...) AND
+                     (fecha_venta < ...))
+Execution Time: 4.180 ms
+```
+
+</div>
+</Comparacion>
+
+</Motor>
+<Motor id="mysql" titulo="MySQL">
+
+<Comparacion izquierda="Sin índice" derecha="Con índice sobre fecha_venta">
+<div slot="antes" data-code-title="EXPLAIN">
+
+```text
+table     type  key   rows    Extra
+entradas  ALL   NULL  144000  Using where
+```
+
+</div>
+<div slot="despues" data-code-title="EXPLAIN">
+
+```text
+table     type   key                       rows  Extra
+entradas  range  idx_entradas_fecha_venta  2400  Using index condition
+```
+
+</div>
+</Comparacion>
+
+</Motor>
+</PorMotor>
+
+<Nota>
+**Resultados reales.** Los planes se obtuvieron sobre la base de ejemplo (PostgreSQL 18 y MariaDB 10.4) y se abreviaron para la lectura. Los tiempos varían según el equipo; lo relevante es el cambio de estrategia.
+</Nota>
+
+El plan sin índice descarta 141 601 filas para quedarse con 2400; con el índice, el motor accede directamente a las filas del rango. El índice, sin embargo, no es gratuito: ocupa espacio y encarece cada inserción en `entradas`. Evaluar esa relación es parte del análisis que se le puede pedir al agente.
+
+<Prompt titulo="análisis de rendimiento">
+Obtenga el plan de ejecución de la consulta de ventas de un día sobre entradas. Explique el plan en términos simples, proponga el índice que lo mejoraría y estime su costo en espacio y en inserciones. No cree el índice: muéstreme la sentencia para que yo la ejecute y luego compare ambos planes.
+</Prompt>
+
+<Recuadro tipo="advertencia">
+El usuario `agente_lectura` no puede crear índices, y así debe ser en una base compartida. Las pruebas de índices se realizan sobre una base local de desarrollo, con un usuario propio, o se delegan en quien administra la base. La sección 6.6 muestra cómo organizar ese trabajo.
+</Recuadro>
+
+### Claves foráneas sin índice
+
+<div data-engine-only="postgresql">
+
+PostgreSQL no crea índices automáticamente sobre las columnas de las claves foráneas. Sin ellos, las reuniones por esas columnas y el borrado de filas referenciadas pueden requerir recorridos completos. Un agente puede detectarlas con el catálogo del sistema:
+
+```sql
+SELECT c.conrelid::regclass AS tabla, a.attname AS columna
+FROM pg_constraint c
+JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+WHERE c.contype = 'f'
+  AND NOT EXISTS (
+      SELECT 1 FROM pg_index i
+      WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1])
+ORDER BY 1, 2;
+```
+
+En *Tu Cine*, la consulta señala cinco columnas, entre ellas `entradas.butaca`. La consulta contempla solo claves foráneas de una columna, suficiente para este esquema.
+
+</div>
+
+<div data-engine-only="mysql">
+
+En MySQL y MariaDB con el motor InnoDB, **toda clave foránea requiere un índice**, y el motor lo crea automáticamente si no existe. Por eso este problema, frecuente en PostgreSQL, no se presenta en MySQL. Es un ejemplo de diferencia entre motores que conviene que el agente explicite cuando propone optimizaciones.
+
+</div>
+
+### Mantenimiento
+
+El agente también puede diagnosticar el estado físico de la base: tamaño de tablas e índices y, en PostgreSQL, la acumulación de filas muertas que deja cada `UPDATE` y `DELETE`.
+
+<PorMotor>
+<Motor id="postgresql" titulo="Tamaño y estado de las tablas (PostgreSQL)">
+
+```sql
+SELECT relname AS tabla,
+       pg_size_pretty(pg_total_relation_size(relid)) AS total,
+       pg_size_pretty(pg_relation_size(relid))       AS datos,
+       n_live_tup AS filas_vivas,
+       n_dead_tup AS filas_muertas,
+       last_autovacuum, last_autoanalyze
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(relid) DESC;
+```
+
+</Motor>
+<Motor id="mysql" titulo="Tamaño de las tablas (MySQL)">
+
+```sql
+SELECT table_name AS tabla,
+       ROUND((data_length + index_length) / 1024 / 1024, 1) AS total_mb,
+       ROUND(index_length / 1024 / 1024, 1)                 AS indices_mb,
+       table_rows AS filas_estimadas
+FROM information_schema.tables
+WHERE table_schema = DATABASE()
+ORDER BY data_length + index_length DESC;
+```
+
+</Motor>
+</PorMotor>
+
+<div data-engine-only="postgresql">
+
+`VACUUM` recupera el espacio de las filas muertas y `ANALYZE` actualiza las estadísticas que usa el planificador; `VACUUM (ANALYZE)` realiza ambas tareas. El proceso *autovacuum* las ejecuta periódicamente, pero después de cargas o modificaciones masivas conviene ejecutarlas de forma explícita. Requieren ser propietario de la tabla, por lo que el agente de solo lectura puede **diagnosticar** la necesidad, pero no ejecutarlas.
+
+</div>
+
+<div data-engine-only="mysql">
+
+`ANALYZE TABLE` actualiza las estadísticas de distribución de los índices, y `OPTIMIZE TABLE` reorganiza físicamente la tabla y recupera espacio. Ambas requieren privilegios que el usuario de solo lectura no tiene: el agente puede diagnosticar la necesidad, pero no ejecutarlas.
+
+</div>
+
+<Seccion n="6.6" id="versionado">Versionado de la base de datos junto al código</Seccion>
+
+El código fuente de un proyecto se versiona con Git: cada rama y cada *commit* describen un estado preciso del código, al que se puede volver en cualquier momento. Con la base de datos, en cambio, es frecuente que su estructura exista solo en el servidor, modificada a mano a lo largo del tiempo. Cuando eso ocurre, nadie puede reconstruir con certeza cómo era la base hace un mes, ni qué cambios requiere la rama en la que se está trabajando.
+
+<Cliente ids="chatgpt claude-desktop">
+<Recuadro tipo="nota" titulo="cliente seleccionado">
+El flujo de trabajo de esta sección requiere un agente con acceso al repositorio y a la terminal (Claude Code, Codex, OpenCode o Cursor). Con el cliente seleccionado puede aplicarse la organización de los scripts, pero la construcción y comparación de las bases debe realizarse manualmente.
+</Recuadro>
+</Cliente>
+
+La solución es tratar la estructura de la base como código: **scripts SQL versionados en el mismo repositorio**, a partir de los cuales la base puede reconstruirse en cualquier momento. Para un agente esto es especialmente valioso: puede reconstruir y comparar distintos estados de la base sin depender de su memoria de la sesión ni de la del usuario.
+
+<Figura n="6.1" titulo="Cada estado del repositorio define un estado reproducible de la base.">
+  <VersionadoBD />
+  <Fragment slot="pie">La base <code>cine_main</code> se construye con los scripts de la rama <code>main</code>; <code>cine_rama</code>, con los mismos scripts más los cambios de la rama. Al integrar la rama, sus cambios se incorporan a los scripts base.</Fragment>
+</Figura>
+
+### Una organización posible
+
+No existe una única forma correcta de organizar los scripts. La siguiente es simple y suficiente para proyectos pequeños y medianos:
+
+```text
+proyecto/
+├── src/                          código de la aplicación
+└── db/
+    ├── base/                     estado de la base en main
+    │   ├── 00_eliminar.sql       elimina todos los objetos
+    │   ├── 01_esquema.sql        tablas y restricciones
+    │   ├── 02_disparadores.sql
+    │   └── 03_vistas.sql
+    ├── datos/
+    │   └── carga.sql             datos de prueba
+    └── cambios/                  cambios de la rama en curso
+        ├── indice-ventas.sql
+        └── indice-ventas.pruebas.sql
+```
+
+Las reglas de trabajo son tres:
+
+1. **`db/base` describe el estado de `main`.** Ejecutar sus scripts sobre una base vacía produce exactamente la estructura vigente.
+2. **Cada rama agrega sus cambios en `db/cambios`**, en un script **idempotente**: puede ejecutarse varias veces sin error ni efectos duplicados. Esto permite aplicarlo, corregirlo y volver a aplicarlo durante el desarrollo.
+3. **Al integrar la rama**, sus cambios se incorporan a los scripts de `db/base` y el archivo de cambios se elimina, o se conserva como historial.
+
+<Nota>
+**Herramientas de migraciones.** Herramientas como Flyway o Liquibase, y los sistemas de migraciones de los *frameworks* (Laravel, Django, Prisma, entre otros), implementan la misma idea con una secuencia numerada de scripts y una tabla que registra cuáles se aplicaron. El principio es idéntico: la estructura de la base se deriva de archivos versionados.
+</Nota>
+
+### Un script de cambios idempotente
+
+La rama `indice-ventas` agrega el índice de la sección 6.5 y la restricción que faltaba en la sección 6.2:
+
+<PorMotor>
+<Motor id="postgresql" titulo="db/cambios/indice-ventas.sql (PostgreSQL)">
+
+```sql
+-- Rama indice-ventas. Idempotente: puede ejecutarse más de una vez.
+BEGIN;
+
+CREATE INDEX IF NOT EXISTS idx_entradas_fecha_venta
+    ON entradas (fecha_venta);
+
+ALTER TABLE funciones DROP CONSTRAINT IF EXISTS uq_funciones_sala_horario;
+ALTER TABLE funciones ADD CONSTRAINT uq_funciones_sala_horario
+    UNIQUE (sala, fecha, hora);
+
+COMMIT;
+
+ANALYZE entradas;
+```
+
+</Motor>
+<Motor id="mysql" titulo="db/cambios/indice-ventas.sql (MySQL)">
+
+```sql
+-- Rama indice-ventas. Idempotente: puede ejecutarse más de una vez.
+-- MySQL no admite IF NOT EXISTS en CREATE INDEX: se consulta el catálogo.
+SET @existe := (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'entradas'
+                  AND index_name = 'idx_entradas_fecha_venta');
+SET @sql := IF(@existe = 0,
+               'CREATE INDEX idx_entradas_fecha_venta ON entradas (fecha_venta)',
+               'DO 0');
+PREPARE st FROM @sql;
+EXECUTE st;
+DEALLOCATE PREPARE st;
+
+SET @existe := (SELECT COUNT(*) FROM information_schema.table_constraints
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'funciones'
+                  AND constraint_name = 'uq_funciones_sala_horario');
+SET @sql := IF(@existe = 0,
+               'ALTER TABLE funciones ADD CONSTRAINT uq_funciones_sala_horario UNIQUE (sala, fecha, hora)',
+               'DO 0');
+PREPARE st FROM @sql;
+EXECUTE st;
+DEALLOCATE PREPARE st;
+```
+
+</Motor>
+</PorMotor>
+
+<div data-engine-only="postgresql">
+
+En PostgreSQL, las sentencias de definición (DDL) son transaccionales: si la restricción no puede crearse, la transacción completa se revierte y el índice tampoco queda creado. La base nunca queda en un estado intermedio.
+
+</div>
+
+<div data-engine-only="mysql">
+
+En MySQL, las sentencias de definición (DDL) **no son transaccionales**: cada una se confirma de inmediato. Si la segunda falla, la primera ya quedó aplicada. Por eso la idempotencia es aún más importante: permite corregir el problema y volver a ejecutar el script completo.
+
+</div>
+
+Junto al script conviene escribir sus **pruebas**: consultas que deben devolver cero filas si el cambio se aplicó correctamente y los datos lo respetan.
+
+```sql
+-- db/cambios/indice-ventas.pruebas.sql
+-- Cada consulta debe devolver cero filas.
+
+-- Ninguna sala tiene dos funciones en la misma fecha y hora
+SELECT sala, fecha, hora, COUNT(*) AS funciones
+FROM funciones
+GROUP BY sala, fecha, hora
+HAVING COUNT(*) > 1;
+
+-- La restricción existe
+SELECT 'falta la restricción uq_funciones_sala_horario' AS error
+FROM (SELECT 1 AS x) t
+WHERE NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'funciones'
+      AND constraint_name = 'uq_funciones_sala_horario');
+```
+
+### Comparación de estados
+
+Con esta organización, el agente puede construir la base de `main` y la de la rama y compararlas. El comando `git show main:ruta` obtiene un archivo tal como está en `main`, sin cambiar de rama y sin afectar los cambios en curso, confirmados o no.
+
+<PorMotor>
+<Motor id="postgresql" titulo="Terminal (base local de desarrollo, usuario propio)">
+
+```sh
+# Estado de main: scripts de db/base y datos, tal como están en main
+createdb cine_main
+for f in base/01_esquema base/02_disparadores base/03_vistas datos/carga; do
+  git show main:db/$f.sql | psql -d cine_main
+done
+
+# Estado de la rama: archivos actuales más los cambios de la rama
+createdb cine_rama
+psql -d cine_rama -f db/base/01_esquema.sql -f db/base/02_disparadores.sql \
+     -f db/base/03_vistas.sql -f db/datos/carga.sql \
+     -f db/cambios/indice-ventas.sql -f db/cambios/indice-ventas.pruebas.sql
+```
+
+</Motor>
+<Motor id="mysql" titulo="Terminal (base local de desarrollo, usuario propio)">
+
+```sh
+# Estado de main: scripts de db/base y datos, tal como están en main
+mysql -u ‹USUARIO› -p -e "CREATE DATABASE cine_main"
+for f in base/01_esquema base/02_disparadores base/03_vistas datos/carga; do
+  git show main:db/$f.sql | mysql -u ‹USUARIO› -p cine_main
+done
+
+# Estado de la rama: archivos actuales más los cambios de la rama
+mysql -u ‹USUARIO› -p -e "CREATE DATABASE cine_rama"
+cat db/base/01_esquema.sql db/base/02_disparadores.sql db/base/03_vistas.sql \
+    db/datos/carga.sql db/cambios/indice-ventas.sql \
+    db/cambios/indice-ventas.pruebas.sql | mysql -u ‹USUARIO› -p cine_rama
+```
+
+Para no ingresar la contraseña en cada comando puede usarse la configuración de credenciales del capítulo 5, con el usuario de desarrollo.
+
+</Motor>
+</PorMotor>
+
+<Prompt titulo="comparar main y la rama">
+Estoy en la rama indice-ventas. Construya dos bases locales de desarrollo: cine_main, con los scripts de db/ tal como están en main (use git show, sin cambiar de rama), y cine_rama, con los archivos actuales más db/cambios/indice-ventas.sql. Ejecute las pruebas de la rama sobre cine_rama e informe el resultado. Luego compare en ambas bases el plan de ejecución de la consulta de ventas de un día. Utilice mi usuario de desarrollo local y no modifique ninguna otra base.
+</Prompt>
+
+Sobre la base de ejemplo, el agente encontrará que el script de cambios **falla**: la restricción no puede crearse porque ya existe una sala con dos funciones en el mismo horario (sección 6.2). Es precisamente el tipo de problema que conviene descubrir en una base local reconstruible y no al aplicar el cambio en producción. La corrección del dato, en este caso, requiere una decisión humana: cuál de las dos funciones es la válida.
+
+<Recuadro tipo="practica">
+Este flujo requiere escribir en la base, por lo que se realiza sobre bases locales de desarrollo, creadas y eliminadas a voluntad, con un usuario propio y no con `agente_lectura`. Es la situación de la primera columna de la tabla de la sección 3.7.
+</Recuadro>
+
+<Seccion n="6.7" id="desarrollo">La base y el código de la aplicación</Seccion>
+
+En el desarrollo de software, el agente suele trabajar sobre el repositorio de la aplicación y, al mismo tiempo, sobre la base. Esa combinación permite tareas que ninguna de las dos partes resuelve por separado: comprobar que un cambio de esquema no rompe las consultas escritas en el código, detectar columnas que el código ya no utiliza, o medir el efecto de un cambio en el *backend* sobre las consultas que llegan a la base. Estas tareas exceden el alcance de la asignatura, pero se apoyan en los mismos principios de este capítulo: acceso acotado, cambios versionados y verificación de cada conclusión.

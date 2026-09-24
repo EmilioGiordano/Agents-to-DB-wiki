@@ -1,0 +1,6 @@
+---
+// Contenido visible solo para los clientes indicados (lista separada por espacios).
+interface Props { ids: string }
+const { ids } = Astro.props;
+---
+<div class="client-variant" data-client-only={ids}><slot /></div>

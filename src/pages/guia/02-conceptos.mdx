@@ -1,0 +1,157 @@
+---
+layout: ../../layouts/Guide.astro
+num: '2'
+titulo: 'Conceptos: modelos, agentes y MCP'
+lede: Antes de configurar nada conviene distinguir qué es un modelo de lenguaje, qué agrega un agente y qué papel cumple el Model Context Protocol. Este capítulo presenta esos conceptos y las diferencias prácticas entre asistentes de chat y agentes.
+secciones:
+  - { n: '2.1', id: 'modelo-agente', titulo: 'Modelo, asistente y agente' }
+  - { n: '2.2', id: 'mcp', titulo: 'Model Context Protocol' }
+  - { n: '2.3', id: 'recorrido', titulo: 'Recorrido de un pedido' }
+  - { n: '2.4', id: 'local-nube', titulo: 'Local y en la nube' }
+  - { n: '2.5', id: 'chat-agente', titulo: 'Asistentes de chat y agentes' }
+  - { n: '2.6', id: 'contexto', titulo: 'Qué ve el modelo' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Figura from '../../components/Figura.astro';
+import FlujoConsulta from '../../components/figuras/FlujoConsulta.astro';
+import PorCliente from '../../components/PorCliente.astro';
+import Cliente from '../../components/Cliente.astro';
+
+<Objetivos>
+- Distinguir entre modelo de lenguaje, asistente de chat y agente.
+- Explicar qué es un servidor MCP y cómo interviene en una consulta a la base de datos.
+- Identificar qué combinaciones de cliente y base de datos son posibles, locales o en la nube.
+</Objetivos>
+
+<Seccion n="2.1" id="modelo-agente">Modelo, asistente y agente</Seccion>
+
+Los tres términos suelen usarse como sinónimos, pero designan cosas distintas:
+
+- **Modelo de lenguaje.** Es el componente que, a partir de un texto de entrada, genera un texto de salida. Por sí solo no puede consultar una base de datos, leer un archivo ni ejecutar un comando: solo produce texto.
+- **Asistente de chat.** Es una aplicación que permite conversar con un modelo, como Claude o ChatGPT en su versión web. Puede incorporar algunas herramientas, pero su uso principal es la conversación.
+- **Agente.** Es un programa que combina un modelo con un conjunto de **herramientas** y un ciclo de trabajo: el modelo decide qué herramienta usar, el programa la ejecuta, el resultado vuelve al modelo y el ciclo se repite hasta completar la tarea. Claude Code, Codex, OpenCode y Cursor son agentes orientados al desarrollo de software.
+
+<Nota>
+**Herramienta.** Función que el agente pone a disposición del modelo, descrita por un nombre, un propósito y sus parámetros. Por ejemplo, `execute_sql(sql)`. El modelo no la ejecuta: solicita su ejecución, y el agente la lleva a cabo.
+</Nota>
+
+La diferencia práctica es que un agente puede **actuar**: si se le pide analizar una base, puede listar las tablas, leer su definición, escribir consultas, ejecutarlas, examinar los resultados y volver a consultar, sin que el usuario intervenga en cada paso. Esa autonomía es lo que lo vuelve útil y, a la vez, lo que obliga a acotar sus permisos (capítulo 3).
+
+<Seccion n="2.2" id="mcp">El Model Context Protocol</Seccion>
+
+Para que un agente pueda consultar una base de datos necesita una herramienta que sepa conectarse a ella. En lugar de que cada agente implemente su propia conexión a cada motor, se utiliza un protocolo común: el **Model Context Protocol** (MCP), un estándar abierto presentado por Anthropic en noviembre de 2024 y adoptado desde entonces por la mayoría de los clientes y proveedores.
+
+MCP distingue dos roles:
+
+- **Cliente MCP.** Es el agente o la aplicación que usa las herramientas: Claude Code, Codex, Cursor, etc.
+- **Servidor MCP.** Es un programa que ofrece herramientas. Un servidor de base de datos, por ejemplo, ofrece una herramienta para ejecutar SQL y otra para buscar objetos del esquema.
+
+<Recuadro tipo="nota" titulo="una analogía conocida">
+MCP cumple, para los agentes, un papel similar al de ODBC o JDBC para las aplicaciones: define una interfaz común, de modo que cualquier cliente compatible puede usar cualquier servidor compatible. Así como una aplicación Java no necesita saber si la base es PostgreSQL o MySQL porque delega en el controlador JDBC, un agente no necesita saber cómo conectarse a cada motor porque delega en el servidor MCP.
+</Recuadro>
+
+Un servidor MCP puede ejecutarse de dos maneras:
+
+- **Local (stdio).** El cliente inicia el servidor como un proceso en la misma computadora y se comunica con él por la entrada y salida estándar. Es la forma habitual de conectar bases locales.
+- **Remota (HTTP).** El servidor está publicado en internet y el cliente se conecta por HTTPS, generalmente con autenticación. Es la forma habitual en los servicios de bases de datos en la nube.
+
+<Seccion n="2.3" id="recorrido">Recorrido de un pedido</Seccion>
+
+La figura 2.1 muestra qué ocurre desde que el usuario formula una pregunta hasta que recibe la respuesta. Puede recorrerse paso a paso con los controles.
+
+<Figura n="2.1" titulo="Recorrido de un pedido que requiere consultar la base de datos.">
+  <FlujoConsulta />
+</Figura>
+
+Dos aspectos de este recorrido tienen consecuencias prácticas:
+
+1. **El modelo escribe el SQL.** El servidor MCP ejecuta lo que recibe; no interpreta la intención del usuario. Si la consulta es incorrecta, el resultado lo será también.
+2. **El ciclo puede repetirse.** Para responder una pregunta, el agente puede realizar varias consultas: primero para conocer el esquema, luego para obtener los datos y, eventualmente, para verificar el resultado.
+
+<Seccion n="2.4" id="local-nube">Local y en la nube</Seccion>
+
+Tanto la base de datos como el servidor MCP pueden estar en la computadora del usuario o en la nube. Las combinaciones habituales son las siguientes:
+
+| Base de datos | Servidor MCP | Ejemplo |
+| --- | --- | --- |
+| Local | Local | PostgreSQL o MySQL instalados en la computadora, con DBHub ejecutado por el cliente |
+| En la nube | Local | Una base en un servicio en la nube, con DBHub conectado mediante su cadena de conexión |
+| En la nube | Remoto | El servidor MCP que ofrece el propio servicio: Neon, Supabase o InsForge |
+
+<Nota>
+**Bases de datos como servicio.** Neon y Supabase ofrecen PostgreSQL administrado, con un plan gratuito suficiente para practicar. InsForge es una plataforma de código abierto orientada a agentes que también utiliza PostgreSQL.
+</Nota>
+
+Los servicios en la nube ofrecen servidores MCP propios, que se conectan con pocos pasos y suelen incluir herramientas adicionales, como la creación de ramas de la base o el análisis de planes de ejecución. El capítulo 4 cubre ambas alternativas.
+
+<Seccion n="2.5" id="chat-agente">Asistentes de chat y agentes</Seccion>
+
+Los asistentes de chat en su versión web también admiten servidores MCP, con una limitación importante: **solo pueden conectarse a servidores remotos**, porque la conexión se origina en la infraestructura del proveedor y no en la computadora del usuario. En consecuencia, no pueden acceder a una base de datos local.
+
+| Cliente | Servidores locales | Servidores remotos | Base local |
+| --- | --- | --- | --- |
+| Claude Code, Codex, OpenCode, Cursor | Sí | Sí | Sí |
+| Claude, aplicación de escritorio | Sí | Sí, como conectores | Sí, con servidores locales |
+| Claude, versión web | No | Sí, como conectores personalizados | No |
+| ChatGPT, versión web | No | Sí, en modo desarrollador | No (salvo mediante un túnel) |
+
+Por este motivo, la guía se centra en los agentes, y trata los asistentes de chat solo para bases de datos en la nube. Qué partes de la guía se aplican depende del cliente utilizado:
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+**Claude Code** es el agente de línea de comandos de Anthropic. Puede iniciar servidores MCP locales, conectarse a servidores remotos y ejecutar comandos en la terminal, por lo que admite todas las alternativas de la guía: servidor MCP local (capítulo 4), servidores de servicios en la nube (sección 4.5) y acceso por terminal (capítulo 5). Requiere una suscripción de Claude o una clave de API.
+
+</Cliente>
+
+<Cliente ids="codex">
+
+**Codex** es el agente de línea de comandos de OpenAI. Puede iniciar servidores MCP locales, conectarse a servidores remotos y ejecutar comandos en la terminal, por lo que admite todas las alternativas de la guía: servidor MCP local (capítulo 4), servidores de servicios en la nube (sección 4.5) y acceso por terminal (capítulo 5). Requiere una cuenta de ChatGPT o una clave de API de OpenAI.
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+**OpenCode** es un agente de código abierto para la terminal, que puede utilizar modelos de distintos proveedores. Admite todas las alternativas de la guía: servidor MCP local (capítulo 4), servidores de servicios en la nube (sección 4.5) y acceso por terminal (capítulo 5). A diferencia de los demás clientes, por defecto no solicita aprobación antes de actuar (sección 3.2).
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+**Cursor** es un editor de código con un agente integrado. Puede iniciar servidores MCP locales, conectarse a servidores remotos y ejecutar comandos en la terminal integrada, por lo que admite todas las alternativas de la guía: servidor MCP local (capítulo 4), servidores de servicios en la nube (sección 4.5) y acceso por terminal (capítulo 5).
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+La **aplicación de escritorio de Claude** (Windows y macOS) puede iniciar servidores MCP locales, de modo que puede conectarse a una base local con la configuración del capítulo 4. No ejecuta comandos en la terminal, por lo que el capítulo 5 no se aplica. La **versión web**, en cambio, solo admite conectores remotos y sirve únicamente para bases en la nube (sección 4.5). Los conectores personalizados están disponibles en todos los planes; el plan gratuito admite uno.
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+**ChatGPT** solo admite servidores MCP remotos, mediante el modo desarrollador, disponible para cuentas Plus, Pro, Business, Enterprise y Education; en las cuentas de organización debe habilitarlo un administrador. No puede acceder a una base local ni ejecutar comandos, por lo que con este cliente la guía se aplica a bases en la nube (sección 4.5). OpenAI ofrece además un túnel seguro (*Secure MCP Tunnel*) para alcanzar servidores dentro de una red privada, cuya configuración excede el alcance de esta guía.
+
+</Cliente>
+
+</PorCliente>
+
+<Nota>
+**Verificación.** La información sobre clientes, planes y disponibilidad fue verificada en septiembre de 2026.
+</Nota>
+
+<Seccion n="2.6" id="contexto">Qué ve el modelo</Seccion>
+
+Todo lo que el agente obtiene de la base (nombres de tablas, definiciones, filas de resultados) pasa a formar parte del **contexto** de la conversación, es decir, del texto que se envía al modelo en cada paso. De aquí se desprenden tres consecuencias:
+
+- **Privacidad.** Salvo que se utilice un modelo ejecutado localmente, los datos consultados se envían al proveedor del modelo. El capítulo 3 muestra cómo excluir columnas sensibles.
+- **Tamaño.** El contexto tiene un límite. Una consulta que devuelve cien mil filas no es útil para el modelo y consume ese límite. Por eso los servidores MCP permiten fijar un máximo de filas por consulta.
+- **Costo.** El uso de los modelos se mide, en general, por la cantidad de texto procesado. Consultas más acotadas implican conversaciones más económicas.
+
+<Recuadro tipo="practica">
+Pedir al agente que primero cuente, agrupe o resuma, y solo después muestre filas concretas, produce respuestas más precisas y conversaciones más cortas.
+</Recuadro>

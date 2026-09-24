@@ -1,0 +1,129 @@
+---
+import Base from '../layouts/Base.astro';
+import { capitulos, hrefCapitulo } from '../data/toc';
+import { url } from '../lib/url';
+const principales = capitulos.filter((c) => !/[A-Z]/.test(c.num));
+const apendices = capitulos.filter((c) => /[A-Z]/.test(c.num));
+---
+
+<Base title="Agentes de IA y bases de datos">
+  <main class="home">
+    <header class="home__head">
+      <p class="home__course">Laboratorio de Bases de Datos: material complementario</p>
+      <h1>Agentes de IA y bases de datos</h1>
+      <p class="home__lede">
+        Guía práctica para conectar bases de datos SQL, locales o en la nube, a agentes de IA como Claude Code, Codex
+        u OpenCode, y para aprovechar esa conexión en la validación de reglas de negocio, la consulta de datos y el
+        análisis del rendimiento, sin resignar control sobre lo que el agente puede hacer.
+      </p>
+      <p class="home__start"><a href={url('/guia/01-introduccion/')}>Comenzar la lectura</a></p>
+    </header>
+
+    <section class="home__toc" aria-labelledby="toc-t">
+      <h2 id="toc-t">Contenido</h2>
+      <ol>
+        {principales.map((c) => (
+          <li>
+            <span class="n">{c.num}</span>
+            <a href={url(hrefCapitulo(c))} class={c.listo ? undefined : 'muted'}>{c.titulo}</a>
+          </li>
+        ))}
+      </ol>
+      <h3>Apéndices</h3>
+      <ol>
+        {apendices.map((c) => (
+          <li>
+            <span class="n">{c.num}</span>
+            <a href={url(hrefCapitulo(c))} class={c.listo ? undefined : 'muted'}>{c.titulo}</a>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="home__req" aria-labelledby="req-t">
+      <h2 id="req-t">Antes de empezar</h2>
+      <p>
+        La guía supone conocimientos de SQL a nivel de la asignatura: creación de tablas y restricciones, consultas con
+        reuniones y agregaciones, y nociones de usuarios y privilegios. Los ejemplos se presentan para PostgreSQL y
+        MySQL; el selector de la barra superior elige cuál mostrar. Se utilizan los casos de estudio de la cátedra.
+      </p>
+    </section>
+  </main>
+</Base>
+
+<style>
+  .home {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 6rem;
+  }
+  .home__course {
+    font-family: var(--sans);
+    font-size: 0.9375rem;
+    color: var(--ink-2);
+    margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: clamp(2.25rem, 1.5rem + 3vw, 3.25rem);
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 1.25rem;
+    text-wrap: balance;
+  }
+  .home__lede {
+    font-size: 1.1875rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin: 0 0 1.5rem;
+  }
+  .home__start {
+    font-family: var(--sans);
+    font-weight: 600;
+    margin: 0 0 3.5rem;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 1rem;
+    padding-top: 1rem;
+    border-top: 1.5px solid var(--ink);
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    margin: 1.75rem 0 0.5rem;
+  }
+  .home__toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .home__toc li {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 1.0625rem;
+  }
+  .home__toc .n {
+    font-family: var(--sans);
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .home__toc a {
+    color: var(--ink);
+  }
+  .muted {
+    color: var(--ink-2);
+  }
+  .home__req {
+    margin-top: 3.5rem;
+  }
+  .home__req p {
+    margin: 0;
+  }
+</style>

@@ -1,0 +1,62 @@
+---
+layout: ../../layouts/Guide.astro
+num: 'C'
+titulo: Glosario
+lede: Términos técnicos utilizados en la guía, con la sección en la que se tratan.
+---
+
+<dl class="glossary">
+  <dt>Agente</dt>
+  <dd>Programa que combina un modelo de lenguaje con herramientas y un ciclo de trabajo, de modo que puede actuar sobre su entorno para completar una tarea. Sección 2.1.</dd>
+
+  <dt>Asistente de chat</dt>
+  <dd>Aplicación para conversar con un modelo de lenguaje, como Claude o ChatGPT en su versión web. Sección 2.1.</dd>
+
+  <dt>Cadena de conexión</dt>
+  <dd>Texto que reúne los datos necesarios para conectarse a una base: motor, usuario, contraseña, servidor, puerto y nombre de la base. Por ejemplo, <code>postgres://usuario:contraseña@localhost:5432/base</code>. Sección 3.6.</dd>
+
+  <dt>Cliente MCP</dt>
+  <dd>Aplicación que utiliza las herramientas ofrecidas por servidores MCP. Sección 2.2.</dd>
+
+  <dt>Columna calculada</dt>
+  <dd>Columna que almacena un valor derivable de otros datos, mantenido por la aplicación o por un disparador. Sección 6.4.</dd>
+
+  <dt>Contexto</dt>
+  <dd>Conjunto de texto que el modelo recibe en cada paso: instrucciones, conversación y resultados de herramientas. Tiene un tamaño máximo. Sección 2.6.</dd>
+
+  <dt>DBHub</dt>
+  <dd>Servidor MCP de código abierto para PostgreSQL, MySQL, MariaDB y otros motores, recomendado en esta guía. Sección 4.1.</dd>
+
+  <dt>Idempotencia</dt>
+  <dd>Propiedad de un script que puede ejecutarse varias veces con el mismo resultado que una sola ejecución. Sección 6.6.</dd>
+
+  <dt>Inyección de instrucciones</dt>
+  <dd>Riesgo de que un texto contenido en los datos sea interpretado por el modelo como una instrucción (<i>prompt injection</i>). Sección 7.3.</dd>
+
+  <dt>MCP (Model Context Protocol)</dt>
+  <dd>Protocolo abierto que estandariza la conexión entre agentes y herramientas externas. Sección 2.2.</dd>
+
+  <dt>Migración</dt>
+  <dd>Script que lleva la estructura de una base de un estado a otro, versionado junto al código. Sección 6.6.</dd>
+
+  <dt>Mínimo privilegio</dt>
+  <dd>Principio según el cual cada usuario o programa debe operar con los menores permisos necesarios para su tarea. Sección 3.1.</dd>
+
+  <dt>Modelo de lenguaje</dt>
+  <dd>Componente que genera texto a partir de un texto de entrada. Sección 2.1.</dd>
+
+  <dt>Plan de ejecución</dt>
+  <dd>Estrategia elegida por el motor para resolver una consulta, que se obtiene con <code>EXPLAIN</code>. Sección 6.5.</dd>
+
+  <dt>Prompt</dt>
+  <dd>Texto con el que se le formula un pedido a un modelo o a un agente. Sección 1.5.</dd>
+
+  <dt>Servidor MCP</dt>
+  <dd>Programa que ofrece herramientas a los clientes MCP, por ejemplo para ejecutar consultas en una base. Puede ser local (stdio) o remoto (HTTP). Sección 2.2.</dd>
+
+  <dt>stdio</dt>
+  <dd>Entrada y salida estándar de un proceso. Los servidores MCP locales se comunican con el cliente por este medio. Sección 2.2.</dd>
+
+  <dt>Variable de entorno</dt>
+  <dd>Valor con nombre definido en el sistema operativo y heredado por los programas que se inician. Se utiliza para no escribir credenciales en archivos. Sección 4.2.</dd>
+</dl>

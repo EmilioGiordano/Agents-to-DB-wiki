@@ -1,0 +1,262 @@
+---
+// Figura interactiva: recorrido de un pedido entre el usuario, el agente,
+// el servidor MCP y la base de datos. Avanza sola al entrar en pantalla,
+// salvo que el lector haya pedido reducir el movimiento.
+const pasos = [
+  { t: 'El usuario formula un pedido en lenguaje natural: «¿Qué película recaudó más en marzo?».', flecha: 'a1', dot: [228, 84] },
+  { t: 'El modelo interpreta el pedido y decide si necesita datos. Si puede responder con lo que ya sabe, no utiliza ninguna herramienta y salta al último paso.', nodo: 'agente', dot: [295, 100] },
+  { t: 'El agente invoca la herramienta execute_sql del servidor MCP y le envía una consulta SQL escrita por el modelo.', flecha: 'a2', dot: [448, 84] },
+  { t: 'El servidor MCP ejecuta la consulta en la base de datos, conectado como agente_lectura.', flecha: 'a3', dot: [668, 84] },
+  { t: 'La base de datos devuelve las filas resultantes al servidor MCP.', flecha: 'b3', dot: [582, 116] },
+  { t: 'El servidor entrega el resultado al agente, que lo incorpora al contexto de la conversación. Si hacen falta más datos, vuelve al paso 3.', flecha: 'b2', dot: [362, 116] },
+  { t: 'El agente redacta la respuesta para el usuario, idealmente acompañada de la consulta utilizada.', flecha: 'b1', dot: [152, 116] },
+];
+---
+
+<div class="flujo" data-pasos={JSON.stringify(pasos)}>
+  <svg viewBox="0 30 820 140" role="img" aria-labelledby="flujo-t flujo-d">
+    <title id="flujo-t">Recorrido de un pedido a través de un servidor MCP</title>
+    <desc id="flujo-d">
+      El usuario envía un pedido al agente. El agente decide si necesita datos; en ese caso invoca al servidor MCP,
+      que consulta la base de datos. Las filas vuelven al servidor, luego al agente, y el agente responde al usuario.
+    </desc>
+    <defs>
+      <marker id="fl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" class="fl-head" />
+      </marker>
+      <marker id="fl-arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" class="fl-head-on" />
+      </marker>
+    </defs>
+
+    <g class="fl-node" data-nodo="usuario">
+      <rect x="20" y="60" width="130" height="80" rx="4" />
+      <text x="85" y="97" text-anchor="middle" class="fl-strong">Usuario</text>
+      <text x="85" y="115" text-anchor="middle" class="fl-small">pregunta</text>
+    </g>
+    <g class="fl-node" data-nodo="agente">
+      <rect x="230" y="60" width="130" height="80" rx="4" />
+      <text x="295" y="97" text-anchor="middle" class="fl-strong">Agente</text>
+      <text x="295" y="115" text-anchor="middle" class="fl-small">modelo + cliente</text>
+    </g>
+    <g class="fl-node" data-nodo="mcp">
+      <rect x="450" y="60" width="130" height="80" rx="4" />
+      <text x="515" y="97" text-anchor="middle" class="fl-strong">Servidor MCP</text>
+      <text x="515" y="115" text-anchor="middle" class="fl-small">execute_sql</text>
+    </g>
+    <g class="fl-node" data-nodo="bd">
+      <path d="M670 70 v60 a55 10 0 0 0 110 0 v-60" />
+      <ellipse cx="725" cy="70" rx="55" ry="10" />
+      <text x="725" y="108" text-anchor="middle" class="fl-strong">Base de datos</text>
+    </g>
+
+    <g class="fl-arrows">
+      <line data-flecha="a1" x1="152" y1="84" x2="226" y2="84" />
+      <line data-flecha="a2" x1="362" y1="84" x2="446" y2="84" />
+      <line data-flecha="a3" x1="582" y1="84" x2="666" y2="84" />
+      <line data-flecha="b3" x1="668" y1="116" x2="584" y2="116" />
+      <line data-flecha="b2" x1="448" y1="116" x2="364" y2="116" />
+      <line data-flecha="b1" x1="228" y1="116" x2="154" y2="116" />
+    </g>
+
+    <g class="fl-labels">
+      <text x="189" y="74" text-anchor="middle">pedido</text>
+      <text x="404" y="74" text-anchor="middle">consulta SQL</text>
+      <text x="624" y="74" text-anchor="middle">SELECT …</text>
+      <text x="624" y="134" text-anchor="middle">filas</text>
+      <text x="404" y="134" text-anchor="middle">resultado</text>
+      <text x="189" y="134" text-anchor="middle">respuesta</text>
+    </g>
+
+    <circle class="fl-dot" r="6" cx="0" cy="0" />
+  </svg>
+
+  <div class="flujo__panel">
+    <p class="flujo__step" aria-live="polite"></p>
+    <div class="flujo__controls">
+      <button type="button" data-accion="anterior">Anterior</button>
+      <button type="button" data-accion="reproducir">Pausar</button>
+      <button type="button" data-accion="siguiente">Siguiente</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .flujo svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .flujo text {
+    font-family: var(--sans);
+    font-size: 13px;
+    fill: var(--ink);
+  }
+  .flujo .fl-strong {
+    font-weight: 600;
+  }
+  .flujo .fl-small {
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+  .flujo .fl-labels text {
+    font-size: 11.5px;
+    fill: var(--ink-2);
+    transition: fill 0.3s;
+  }
+  .flujo .fl-node rect,
+  .flujo .fl-node path,
+  .flujo .fl-node ellipse {
+    fill: var(--paper-2);
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .flujo .fl-node.is-on rect,
+  .flujo .fl-node.is-on path,
+  .flujo .fl-node.is-on ellipse {
+    stroke: var(--accent);
+    stroke-width: 2;
+    fill: var(--accent-soft);
+  }
+  .flujo .fl-arrows line {
+    stroke: var(--rule);
+    stroke-width: 1.5;
+    marker-end: url(#fl-arrow);
+    transition: stroke 0.3s;
+  }
+  .flujo .fl-arrows line.is-on {
+    stroke: var(--accent);
+    stroke-width: 2;
+    marker-end: url(#fl-arrow-on);
+  }
+  .flujo .fl-head {
+    fill: var(--rule);
+  }
+  .flujo .fl-head-on {
+    fill: var(--accent);
+  }
+  .flujo .fl-dot {
+    fill: var(--accent);
+    transition: transform 0.7s ease-in-out;
+  }
+  .flujo__panel {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .flujo__step {
+    margin: 0;
+    min-height: 3em;
+  }
+  .flujo__step b {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .flujo__controls {
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  .flujo__controls button {
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+  }
+  .flujo__controls button:hover {
+    color: var(--ink);
+    border-color: var(--ink-2);
+  }
+  @media (max-width: 640px) {
+    .flujo__panel {
+      flex-direction: column;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flujo .fl-dot {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  type Paso = { t: string; flecha?: string; nodo?: string; dot: [number, number] };
+
+  document.querySelectorAll<HTMLElement>('.flujo').forEach((root) => {
+    const pasos: Paso[] = JSON.parse(root.dataset.pasos || '[]');
+    const texto = root.querySelector<HTMLElement>('.flujo__step')!;
+    const dot = root.querySelector<SVGCircleElement>('.fl-dot')!;
+    const btnPlay = root.querySelector<HTMLButtonElement>('[data-accion="reproducir"]')!;
+    const reducir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let i = 0;
+    let timer: number | undefined;
+
+    const nodoDeFlecha: Record<string, string> = { a1: 'agente', a2: 'mcp', a3: 'bd', b3: 'mcp', b2: 'agente', b1: 'usuario' };
+
+    function pintar() {
+      const p = pasos[i];
+      root.querySelectorAll('.is-on').forEach((el) => el.classList.remove('is-on'));
+      if (p.flecha) root.querySelector(`[data-flecha="${p.flecha}"]`)?.classList.add('is-on');
+      const nodo = p.nodo || (p.flecha ? nodoDeFlecha[p.flecha] : undefined);
+      if (nodo) root.querySelector(`[data-nodo="${nodo}"]`)?.classList.add('is-on');
+      dot.style.transform = `translate(${p.dot[0]}px, ${p.dot[1]}px)`;
+      texto.innerHTML = `<b>Paso ${i + 1} de ${pasos.length}.</b> ${p.t}`;
+    }
+
+    function detener() {
+      window.clearInterval(timer);
+      timer = undefined;
+      btnPlay.textContent = 'Reproducir';
+    }
+    function reproducir() {
+      detener();
+      btnPlay.textContent = 'Pausar';
+      timer = window.setInterval(() => {
+        i = (i + 1) % pasos.length;
+        pintar();
+      }, 3200);
+    }
+
+    root.querySelector('[data-accion="anterior"]')!.addEventListener('click', () => {
+      detener();
+      i = (i - 1 + pasos.length) % pasos.length;
+      pintar();
+    });
+    root.querySelector('[data-accion="siguiente"]')!.addEventListener('click', () => {
+      detener();
+      i = (i + 1) % pasos.length;
+      pintar();
+    });
+    btnPlay.addEventListener('click', () => (timer ? detener() : reproducir()));
+
+    pintar();
+    if (reducir) {
+      detener();
+      return;
+    }
+    // Comienza a avanzar solo cuando la figura es visible.
+    const obs = new IntersectionObserver((entradas) => {
+      for (const e of entradas) {
+        if (e.isIntersecting && timer === undefined && btnPlay.textContent === 'Pausar') reproducir();
+        if (!e.isIntersecting && timer !== undefined) {
+          window.clearInterval(timer);
+          timer = undefined;
+        }
+      }
+    }, { threshold: 0.5 });
+    obs.observe(root);
+  });
+</script>

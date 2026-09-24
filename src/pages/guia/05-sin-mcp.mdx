@@ -1,0 +1,213 @@
+---
+layout: ../../layouts/Guide.astro
+num: '5'
+titulo: 'Uso sin MCP: el agente y la terminal'
+lede: Los agentes de desarrollo pueden ejecutar comandos en la terminal, y por lo tanto pueden usar directamente los clientes psql y mysql. Este capítulo muestra cómo configurar esa alternativa sin que el agente deba conocer la contraseña, y cuándo conviene frente a un servidor MCP.
+secciones:
+  - { n: '5.1', id: 'terminal', titulo: 'El agente en la terminal' }
+  - { n: '5.2', id: 'credenciales', titulo: 'Credenciales guardadas' }
+  - { n: '5.3', id: 'instrucciones', titulo: 'Instrucciones para el agente' }
+  - { n: '5.4', id: 'comparacion', titulo: 'MCP o terminal' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Prompt from '../../components/Prompt.astro';
+import PorMotor from '../../components/PorMotor.astro';
+import Motor from '../../components/Motor.astro';
+import PorCliente from '../../components/PorCliente.astro';
+import Cliente from '../../components/Cliente.astro';
+
+<Objetivos>
+- Configurar el acceso a la base desde la terminal sin ingresar la contraseña en cada consulta.
+- Indicar al agente, mediante un archivo de instrucciones, cómo y con qué límites consultar la base.
+- Comparar el acceso por terminal con el acceso mediante un servidor MCP.
+</Objetivos>
+
+<Cliente ids="claude-desktop chatgpt">
+<Recuadro tipo="advertencia" titulo="no aplicable al cliente seleccionado">
+El cliente seleccionado no ejecuta comandos en la terminal, por lo que la alternativa de este capítulo no está disponible. Con este cliente, la conexión se realiza mediante un servidor MCP (capítulo 4). El capítulo puede leerse igualmente para conocer la alternativa.
+</Recuadro>
+</Cliente>
+
+<Seccion n="5.1" id="terminal">El agente como usuario de la terminal</Seccion>
+
+Claude Code, Codex, OpenCode y Cursor pueden ejecutar comandos en la terminal, en general con aprobación previa del usuario. Si el cliente de línea de comandos del motor está instalado (`psql` para PostgreSQL, `mysql` para MySQL y MariaDB), el agente puede consultar la base del mismo modo que lo haría una persona, sin ningún servidor MCP.
+
+La única dificultad es la contraseña: si el cliente la solicita de forma interactiva, el agente no puede ingresarla, y escribirla en el propio comando la expondría en el historial y en la conversación. Ambos motores resuelven este problema con archivos de credenciales del usuario.
+
+<Seccion n="5.2" id="credenciales">Credenciales guardadas</Seccion>
+
+<div data-engine-only="postgresql">
+
+PostgreSQL combina dos archivos: el **archivo de servicios**, que asigna un nombre a un conjunto de parámetros de conexión, y el **archivo de contraseñas**, que el cliente consulta automáticamente cuando el servidor pide una.
+
+<Motor id="postgresql" titulo="Archivo de servicios: %APPDATA%\postgresql\.pg_service.conf (Windows) o ~/.pg_service.conf (macOS y Linux)">
+
+```ini
+[cine_lectura]
+host=localhost
+port=5432
+dbname=cadena_cines
+user=agente_lectura
+```
+
+</Motor>
+
+<Motor id="postgresql" titulo="Archivo de contraseñas: %APPDATA%\postgresql\pgpass.conf (Windows) o ~/.pgpass (macOS y Linux)">
+
+```text
+# servidor:puerto:base:usuario:contraseña
+localhost:5432:cadena_cines:agente_lectura:‹CONTRASEÑA›
+```
+
+</Motor>
+
+En macOS y Linux, el archivo de contraseñas se ignora si otros usuarios pueden leerlo; deben restringirse sus permisos con `chmod 600 ~/.pgpass`. Con ambos archivos creados, la conexión se establece sin solicitar la contraseña:
+
+<Motor id="postgresql" titulo="Terminal">
+
+```sh
+psql "service=cine_lectura" --csv -c "SELECT COUNT(*) FROM entradas;"
+```
+
+</Motor>
+
+<Nota>
+**`PGPASSWORD`.** También existe la variable de entorno `PGPASSWORD`, pero la documentación de PostgreSQL desaconseja su uso porque, en algunos sistemas, otros usuarios pueden ver las variables de entorno de un proceso.
+</Nota>
+
+</div>
+
+<div data-engine-only="mysql">
+
+MySQL ofrece la herramienta `mysql_config_editor`, que guarda las credenciales en un archivo ofuscado (`.mylogin.cnf`) bajo un nombre de configuración, o *login path*. La contraseña se solicita una sola vez, al crear la configuración:
+
+<Motor id="mysql" titulo="Terminal: se ejecuta una sola vez">
+
+```sh
+mysql_config_editor set --login-path=cine_lectura --host=localhost --user=agente_lectura --password
+```
+
+</Motor>
+
+A partir de ese momento, la conexión se establece sin solicitar la contraseña:
+
+<Motor id="mysql" titulo="Terminal">
+
+```sh
+mysql --login-path=cine_lectura cadena_cines -e "SELECT COUNT(*) FROM entradas;"
+```
+
+</Motor>
+
+<Recuadro tipo="nota" titulo="MariaDB y XAMPP">
+MariaDB no incluye `mysql_config_editor`. La alternativa es un archivo de opciones con permisos restringidos, que se indica con `--defaults-extra-file` como **primera** opción del comando.
+
+```ini
+# lectura.cnf (fuera del repositorio)
+[client]
+host=localhost
+user=agente_lectura
+password=‹CONTRASEÑA›
+database=cadena_cines
+```
+
+```sh
+mysql --defaults-extra-file=‹RUTA›/lectura.cnf -e "SELECT COUNT(*) FROM entradas;"
+```
+</Recuadro>
+
+<Nota>
+**`MYSQL_PWD`.** La variable de entorno `MYSQL_PWD` está desaconsejada por inseguro y marcada como obsoleta desde MySQL 8.4.
+</Nota>
+
+</div>
+
+<Seccion n="5.3" id="instrucciones">Instrucciones para el agente</Seccion>
+
+Los agentes leen, al comenzar cada sesión, un archivo de instrucciones ubicado en la raíz del proyecto. Allí conviene indicar cómo consultar la base y con qué límites. El nombre del archivo, y la forma en que el agente pide autorización para ejecutar comandos, dependen del cliente:
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+Claude Code lee el archivo **`CLAUDE.md`**. Antes de ejecutar un comando en la terminal solicita permiso, y la propia solicitud permite autorizar de forma permanente los comandos de un mismo tipo (por ejemplo, todas las ejecuciones de `psql`).
+
+</Cliente>
+
+<Cliente ids="codex">
+
+Codex lee el archivo **`AGENTS.md`**. Ejecuta los comandos en un entorno aislado (*sandbox*) que puede restringir el acceso a la red; si la conexión a la base falla desde el agente pero funciona desde una terminal común, debe revisarse la configuración de aislamiento o aprobar la ejecución del comando fuera de él.
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+OpenCode lee el archivo **`AGENTS.md`** y, si no existe, `CLAUDE.md`. Por defecto ejecuta comandos sin solicitar aprobación; conviene configurar la sección `permission` de `opencode.json` para que pregunte antes de ejecutar comandos en la terminal.
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+Cursor lee el archivo **`AGENTS.md`** como alternativa simple a las reglas de `.cursor/rules`. Los comandos que el agente propone ejecutar en la terminal requieren aprobación, salvo que se habilite la ejecución automática.
+
+</Cliente>
+
+<Cliente ids="claude-desktop chatgpt">
+
+El cliente seleccionado no ejecuta comandos en la terminal ni lee archivos de instrucciones del proyecto, por lo que esta sección no se aplica.
+
+</Cliente>
+
+</PorCliente>
+
+<PorMotor>
+<Motor id="postgresql" titulo="Fragmento del archivo de instrucciones">
+
+```markdown
+## Base de datos
+
+- Consultar la base con: psql "service=cine_lectura" --csv -c "<consulta>"
+- La conexión es de solo lectura: no intentar modificar datos ni estructura.
+- Al mostrar filas, limitar el resultado con FETCH FIRST 50 ROWS ONLY.
+- Mostrar siempre la consulta utilizada junto con cada resultado.
+```
+
+</Motor>
+<Motor id="mysql" titulo="Fragmento del archivo de instrucciones">
+
+```markdown
+## Base de datos
+
+- Consultar la base con: mysql --login-path=cine_lectura cadena_cines -e "<consulta>"
+- La conexión es de solo lectura: no intentar modificar datos ni estructura.
+- Al mostrar filas, limitar el resultado con LIMIT 50.
+- Mostrar siempre la consulta utilizada junto con cada resultado.
+```
+
+</Motor>
+</PorMotor>
+
+Este archivo cumple una función de orientación, no de seguridad: el agente puede no seguirlo. La barrera efectiva sigue siendo el usuario de solo lectura.
+
+<Prompt titulo="configurar el acceso por terminal">
+Quiero que consulte la base de datos cadena_cines desde la terminal, sin servidor MCP. Indíqueme qué archivos de credenciales debo crear en mi sistema operativo para conectarme como agente_lectura sin ingresar la contraseña en cada consulta; yo completaré la contraseña. Luego agregue al archivo de instrucciones del proyecto una sección que explique cómo consultar la base, y verifique la conexión con una consulta de conteo.
+</Prompt>
+
+<Seccion n="5.4" id="comparacion">MCP o terminal</Seccion>
+
+| Aspecto | Servidor MCP | Terminal |
+| --- | --- | --- |
+| Instalación | Node.js y configuración del cliente | Cliente del motor (`psql`, `mysql`) |
+| Clientes compatibles | Agentes y asistentes de chat | Solo agentes con acceso a la terminal |
+| Solo lectura adicional | Sí (DBHub rechaza escrituras) | No: depende solo de los privilegios |
+| Límite de filas | Configurable en el servidor | Depende de que el agente use `LIMIT` |
+| Formato de los resultados | Estructurado (JSON) | Texto o CSV |
+| Aprobación de cada consulta | Por herramienta | Por comando de terminal |
+| Uso fuera del agente | No | Sí: el mismo acceso sirve a la persona |
+
+<Recuadro tipo="practica">
+El acceso por terminal es una buena opción para empezar y para scripts propios, porque no agrega componentes. El servidor MCP resulta preferible cuando se trabaja con varios clientes, con asistentes de chat o cuando se quiere que el límite de filas y el modo de solo lectura no dependan del comportamiento del agente.
+</Recuadro>

@@ -1,0 +1,12 @@
+---
+// Agrupa variantes <Cliente ids="..."> y ofrece pestañas que cambian la
+// preferencia global de cliente (la misma que el selector de la barra superior).
+import { clientes } from '../data/toc';
+interface Props { solo?: string[] }
+const { solo } = Astro.props;
+const lista = solo ? clientes.filter((c) => solo.includes(c.id)) : clientes;
+---
+<div class="client-tabs" role="group" aria-label="Cliente">
+  {lista.map((c) => <button type="button" data-set-client={c.id}>{c.nombre}</button>)}
+</div>
+<slot />

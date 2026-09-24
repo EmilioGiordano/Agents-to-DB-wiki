@@ -1,0 +1,71 @@
+---
+// Lista de verificación interactiva. El estado se guarda solo en el navegador
+// del lector, como comodidad; la página funciona igual sin almacenamiento.
+interface Grupo { titulo: string; items: string[] }
+interface Props { id: string; grupos: Grupo[] }
+const { id, grupos } = Astro.props;
+let n = 0;
+---
+<div class="checklist-wrap" data-checklist={id}>
+  <p class="checklist-progress" aria-live="polite"></p>
+  {grupos.map((g) => (
+    <>
+      <h3>{g.titulo}</h3>
+      <ul class="checklist">
+        {g.items.map((item) => {
+          const key = `${id}-${n++}`;
+          return (
+            <li>
+              <input type="checkbox" id={key} data-key={key} />
+              <label for={key} set:html={item} />
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  ))}
+  <p><button type="button" class="copy" data-reiniciar>Desmarcar todo</button></p>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-checklist]').forEach((root) => {
+    const storeKey = `guia.checklist.${root.dataset.checklist}`;
+    const boxes = [...root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    const progress = root.querySelector<HTMLElement>('.checklist-progress')!;
+
+    let estado: Record<string, boolean> = {};
+    try {
+      estado = JSON.parse(localStorage.getItem(storeKey) || '{}');
+    } catch {
+      estado = {};
+    }
+
+    const actualizar = () => {
+      const hechos = boxes.filter((b) => b.checked).length;
+      progress.textContent = `${hechos} de ${boxes.length} verificaciones completadas.`;
+    };
+    const guardar = () => {
+      try {
+        localStorage.setItem(storeKey, JSON.stringify(estado));
+      } catch {
+        /* sin almacenamiento disponible */
+      }
+    };
+
+    boxes.forEach((b) => {
+      b.checked = Boolean(estado[b.dataset.key!]);
+      b.addEventListener('change', () => {
+        estado[b.dataset.key!] = b.checked;
+        guardar();
+        actualizar();
+      });
+    });
+    root.querySelector('[data-reiniciar]')?.addEventListener('click', () => {
+      boxes.forEach((b) => (b.checked = false));
+      estado = {};
+      guardar();
+      actualizar();
+    });
+    actualizar();
+  });
+</script>

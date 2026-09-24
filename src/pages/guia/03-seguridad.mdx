@@ -1,0 +1,365 @@
+---
+layout: ../../layouts/Guide.astro
+num: '3'
+titulo: Seguridad y acceso
+lede: Antes de conectar un agente a una base de datos conviene decidir qué podrá hacer. Este capítulo muestra cómo crear un usuario de solo lectura, cómo comprobar que efectivamente no puede modificar nada y cómo proteger los datos sensibles.
+secciones:
+  - { n: '3.1', id: 'minimo-privilegio', titulo: 'Mínimo privilegio' }
+  - { n: '3.2', id: 'capas', titulo: 'Capas de protección' }
+  - { n: '3.3', id: 'usuario-lectura', titulo: 'Usuario de solo lectura' }
+  - { n: '3.4', id: 'verificacion', titulo: 'Verificación' }
+  - { n: '3.5', id: 'datos-sensibles', titulo: 'Datos sensibles' }
+  - { n: '3.6', id: 'credenciales', titulo: 'Credenciales' }
+  - { n: '3.7', id: 'entornos', titulo: 'Desarrollo y producción' }
+---
+import Seccion from '../../components/Seccion.astro';
+import Objetivos from '../../components/Objetivos.astro';
+import Nota from '../../components/Nota.astro';
+import Recuadro from '../../components/Recuadro.astro';
+import Prompt from '../../components/Prompt.astro';
+import PorMotor from '../../components/PorMotor.astro';
+import Motor from '../../components/Motor.astro';
+import Figura from '../../components/Figura.astro';
+import CapasProteccion from '../../components/figuras/CapasProteccion.astro';
+import PorCliente from '../../components/PorCliente.astro';
+import Cliente from '../../components/Cliente.astro';
+
+<Objetivos>
+- Explicar por qué un agente debe conectarse con un usuario propio y con los privilegios mínimos necesarios.
+- Crear un usuario de solo lectura en PostgreSQL y en MySQL.
+- Comprobar, mediante sentencias concretas, qué operaciones permite y cuáles rechaza ese usuario.
+- Distinguir entre un límite de seguridad y una medida de contención.
+</Objetivos>
+
+<Seccion n="3.1" id="minimo-privilegio">El principio de mínimo privilegio</Seccion>
+
+<Nota>
+**Mínimo privilegio.** Formulado por Saltzer y Schroeder en *The Protection of Information in Computer Systems* (1975): cada programa y cada usuario debe operar con el menor conjunto de privilegios necesario para su tarea.
+</Nota>
+
+Un agente de IA conectado a una base de datos ejecuta sentencias SQL a partir de instrucciones en lenguaje natural. La traducción de una instrucción a SQL no siempre es la que el usuario tenía en mente: un pedido como «limpiar los registros duplicados de entradas» puede convertirse en un `DELETE` que el usuario no esperaba, y que se ejecuta con los mismos permisos que tenga la conexión.
+
+Por ese motivo, la pregunta relevante no es si el agente «se va a equivocar», sino **qué consecuencias puede tener un error**. Si el agente se conecta con el usuario administrador, cualquier error es potencialmente irreversible. Si se conecta con un usuario que solo puede leer, el peor resultado posible es una consulta incorrecta o lenta.
+
+La recomendación general de esta guía es, entonces, que **el agente utilice un usuario propio, distinto del administrador, con permisos de lectura únicamente**. Los permisos de escritura se otorgan solo cuando la tarea lo exige, sobre una base de desarrollo, y de forma deliberada.
+
+<Seccion n="3.2" id="capas">Capas de protección</Seccion>
+
+Entre el agente y los datos existen varias barreras. No todas ofrecen la misma garantía: algunas las hace cumplir el propio motor de base de datos y no pueden eludirse desde la conexión; otras dependen de la configuración o de la atención del usuario, y funcionan como contención.
+
+<Figura n="3.1" titulo="Recorrido de tres sentencias emitidas por un agente conectado como agente_lectura.">
+  <CapasProteccion />
+  <Fragment slot="pie">(1) Una consulta de lectura atraviesa todas las capas. (2) Un <code>DELETE</code> es rechazado por la configuración de sesión de solo lectura. (3) Si el agente desactiva primero ese modo, el <code>DELETE</code> es rechazado igualmente por los privilegios.</Fragment>
+</Figura>
+
+- **Aprobación en el cliente.** La mayoría de los clientes solicitan confirmación antes de ejecutar ciertas acciones (el comportamiento de cada uno se detalla a continuación). Es útil, pero depende de que el usuario lea lo que aprueba, y puede desactivarse.
+- **Credenciales.** Un usuario exclusivo para el agente permite identificar sus consultas en los registros del servidor y revocar su acceso sin afectar a nadie más.
+- **Configuración de sesión.** En PostgreSQL puede establecerse que las transacciones del usuario sean de solo lectura por defecto. Es una red de contención: la propia sesión puede desactivarla.
+- **Privilegios.** Los permisos otorgados con `GRANT` son el límite real. Si el usuario no tiene privilegio de `DELETE` sobre una tabla, el motor rechaza la operación sin importar cómo se formule.
+
+### Aprobación en el cliente seleccionado
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+Claude Code solicita autorización antes de usar por primera vez los servidores definidos en el archivo `.mcp.json` de un proyecto, y pide permiso antes de usar herramientas MCP o ejecutar comandos. Los permisos pueden otorgarse de forma permanente mediante reglas; por ejemplo, `mcp__cadena-cines__*` abarca todas las herramientas de ese servidor. En el modo no interactivo (`claude -p`), los servidores del proyecto se cargan sin preguntar, por lo que ese modo no debe usarse con bases compartidas.
+
+</Cliente>
+
+<Cliente ids="codex">
+
+Codex permite fijar el modo de aprobación de cada servidor MCP (`default_tools_approval_mode`) y de cada herramienta (`tools.<herramienta>.approval_mode`) en `config.toml`. Conviene verificar qué modo está vigente y configurarlo explícitamente para que solicite confirmación, en lugar de depender del valor por defecto.
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+Según su documentación, OpenCode **permite por defecto todas las operaciones sin solicitar aprobación**. Para que pida confirmación, debe configurarse la sección `permission` de `opencode.json` con el valor `"ask"` para las herramientas correspondientes. Con este cliente, el usuario de solo lectura es todavía más importante: puede ser la única barrera efectiva.
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+Cursor solicita aprobación por defecto antes de usar una herramienta MCP. Existe un modo automático que ejecuta sin preguntar las herramientas incluidas en una lista de permitidas; si se activa, conviene no incluir en ella herramientas que puedan modificar datos.
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+En la aplicación de escritorio y en la versión web de Claude, las acciones de las herramientas requieren aprobación explícita del usuario.
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+En ChatGPT, las acciones de escritura requieren confirmación por defecto; la decisión puede recordarse durante el resto de la conversación, y en una conversación nueva se vuelve a solicitar. ChatGPT considera de escritura toda herramienta que el servidor no marque expresamente como de solo lectura.
+
+</Cliente>
+
+</PorCliente>
+
+<Recuadro tipo="advertencia">
+La opción `default_transaction_read_only` de PostgreSQL **no es un mecanismo de seguridad**. Cualquier sesión puede ejecutar `BEGIN READ WRITE` o `SET transaction_read_only = off` y continuar. Su valor es evitar modificaciones accidentales; la protección efectiva la dan los privilegios.
+</Recuadro>
+
+<Seccion n="3.3" id="usuario-lectura">Creación de un usuario de solo lectura</Seccion>
+
+Los siguientes scripts se ejecutan una única vez, conectado como administrador, sobre la base `cadena_cines` del caso de estudio *Tu Cine* ([apéndice A](../a-bases-de-ejemplo/)). Los valores entre ‹ y › deben reemplazarse antes de ejecutar.
+
+<PorMotor>
+<Motor id="postgresql" titulo="PostgreSQL: ejecutar como administrador">
+
+```sql
+-- 1. Usuario con el que se conectará el agente
+CREATE ROLE agente_lectura WITH LOGIN PASSWORD '‹CONTRASEÑA›';
+
+-- 2. Conexión a la base y acceso al esquema
+GRANT CONNECT ON DATABASE cadena_cines TO agente_lectura;
+GRANT USAGE ON SCHEMA public TO agente_lectura;
+
+-- 3. Lectura de las tablas y vistas existentes
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO agente_lectura;
+
+-- 4. Lectura de las tablas que el administrador cree en el futuro
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT SELECT ON TABLES TO agente_lectura;
+
+-- 5. Contención: transacciones de solo lectura y consultas acotadas
+ALTER ROLE agente_lectura SET default_transaction_read_only = on;
+ALTER ROLE agente_lectura SET statement_timeout = '30s';
+```
+
+</Motor>
+<Motor id="mysql" titulo="MySQL: ejecutar como administrador">
+
+```sql
+-- 1. Usuario con el que se conectará el agente.
+--    El host indica desde dónde puede conectarse.
+CREATE USER 'agente_lectura'@'localhost' IDENTIFIED BY '‹CONTRASEÑA›';
+
+-- 2. Lectura de todas las tablas y vistas de la base.
+--    Al otorgarse a nivel de base, alcanza también a las tablas futuras.
+GRANT SELECT, SHOW VIEW ON cadena_cines.* TO 'agente_lectura'@'localhost';
+
+-- 3. Contención: consultas por hora y conexiones simultáneas
+ALTER USER 'agente_lectura'@'localhost'
+  WITH MAX_QUERIES_PER_HOUR 2000 MAX_USER_CONNECTIONS 3;
+```
+
+</Motor>
+</PorMotor>
+
+<div data-engine-only="postgresql">
+
+<Nota>
+**`ALTER DEFAULT PRIVILEGES`** solo afecta a los objetos que cree el rol indicado en `FOR ROLE`. Si las tablas las crea otro usuario, debe repetirse la sentencia para ese usuario.
+</Nota>
+
+El paso 4 es necesario porque `GRANT ... ON ALL TABLES` afecta únicamente a las tablas que existen en el momento de ejecutarlo. El paso 5 no otorga ni quita permisos: establece valores por defecto para las sesiones del usuario. `statement_timeout` cancela cualquier consulta que supere los treinta segundos, lo que evita que una consulta mal planteada por el agente degrade el servidor.
+
+<Recuadro tipo="nota" titulo="diferencias entre versiones">
+Hasta PostgreSQL 14 inclusive, cualquier usuario puede crear tablas en el esquema `public`. En esas versiones debe ejecutarse además `REVOKE CREATE ON SCHEMA public FROM PUBLIC;`. A partir de PostgreSQL 14 existe también el rol predefinido `pg_read_all_data`, que otorga lectura sobre todas las tablas de todos los esquemas; es más cómodo, pero también más amplio de lo que suele hacer falta.
+</Recuadro>
+
+</div>
+
+<div data-engine-only="mysql">
+
+<Nota>
+**Usuario y host.** En MySQL, `'agente_lectura'@'localhost'` y `'agente_lectura'@'%'` son usuarios distintos. El segundo acepta conexiones desde cualquier equipo y solo debería usarse si la base está en otro servidor.
+</Nota>
+
+A diferencia de PostgreSQL, MySQL no ofrece un modo de solo lectura por defecto para un usuario ni un tiempo máximo de ejecución fijo por usuario. En MySQL, por lo tanto, **los privilegios son la única barrera** y deben revisarse con especial cuidado. El tiempo máximo de ejecución puede fijarse por sesión con `SET SESSION max_execution_time = 30000;` (en milisegundos, y solo para sentencias `SELECT`). En MariaDB, que se distribuye por ejemplo con XAMPP, la variable equivalente es `max_statement_time` y se expresa en segundos.
+
+</div>
+
+Si se prefiere que sea el propio agente quien redacte el script, puede pedírsele explícitamente que no lo ejecute. Crear usuarios requiere una conexión de administrador, que el agente no debería tener.
+
+<Prompt titulo="redactar el script sin ejecutarlo">
+Necesito crear un usuario de solo lectura llamado agente_lectura para la base ‹NOMBRE_DE_LA_BASE› en ‹PostgreSQL o MySQL›. Redacte el script SQL completo, incluyendo los permisos sobre las tablas que se creen en el futuro, y explique brevemente cada sentencia. No ejecute nada: voy a revisar el script y ejecutarlo yo mismo como administrador.
+</Prompt>
+
+<Seccion n="3.4" id="verificacion">Verificación de los permisos</Seccion>
+
+Un permiso no se da por configurado hasta comprobarlo. La verificación consiste en conectarse con el nuevo usuario y reproducir los tres recorridos de la figura 3.1.
+
+<PorMotor>
+<Motor id="postgresql" titulo="PostgreSQL: conectado como agente_lectura">
+
+```sql
+-- (1) Debe funcionar
+SELECT COUNT(*) FROM entradas;
+
+-- (2) Debe fallar: la sesión es de solo lectura
+DELETE FROM entradas WHERE identrada = 1;
+-- ERROR: cannot execute DELETE in a read-only transaction
+
+-- (3) Aun en una transacción de escritura, debe fallar por privilegios
+BEGIN READ WRITE;
+DELETE FROM entradas WHERE identrada = 1;
+-- ERROR: permission denied for table entradas
+ROLLBACK;
+
+-- Privilegios del usuario, consultados mediante el catálogo estándar
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'agente_lectura'
+ORDER BY table_schema, table_name;
+```
+
+</Motor>
+<Motor id="mysql" titulo="MySQL: conectado como agente_lectura">
+
+```sql
+-- (1) Debe funcionar
+SELECT COUNT(*) FROM entradas;
+
+-- (2) y (3) Deben fallar por privilegios
+DELETE FROM entradas WHERE identrada = 1;
+-- ERROR 1142 (42000): DELETE command denied to user
+--   'agente_lectura'@'localhost' for table ... entradas
+
+-- Privilegios del usuario actual
+SHOW GRANTS;
+```
+
+</Motor>
+</PorMotor>
+
+El texto de los mensajes de error depende del idioma configurado en el servidor; lo relevante es el tipo de rechazo. En PostgreSQL, además, la consulta sobre `information_schema` utiliza el catálogo definido por el estándar SQL, disponible con variaciones en la mayoría de los motores.
+
+Una vez conectado el agente (capítulo 4), conviene que su primera tarea sea esta misma verificación:
+
+<Prompt titulo="primera tarea tras conectar">
+Antes de comenzar, verifique con qué usuario está conectado a la base de datos y qué privilegios tiene sobre cada tabla. Informe el resultado en una tabla. No ejecute ninguna sentencia que modifique datos o estructura; si alguna verificación lo requiriera, muéstreme la sentencia y espere mi confirmación.
+</Prompt>
+
+<Seccion n="3.5" id="datos-sensibles">Protección de datos sensibles</Seccion>
+
+<Nota>
+**Hacia dónde viajan los datos.** Salvo que se utilice un modelo que se ejecute localmente, todo resultado que el agente lee se envía al proveedor del modelo como parte de la conversación. Esto debe considerarse antes de conectar una base con datos personales reales.
+</Nota>
+
+Leer no es inocuo. En el caso de estudio del *Gimnasio*, la tabla `personas` contiene DNI, fecha de nacimiento y domicilio. Si la tarea del agente es analizar la asistencia a clases, esos datos no le hacen falta.
+
+Una solución portable consiste en exponer al agente **vistas** que excluyen las columnas sensibles, ubicadas en un esquema (o una base, en MySQL) separado, y otorgarle acceso solo a ellas.
+
+<PorMotor>
+<Motor id="postgresql" titulo="PostgreSQL: base gimnasio">
+
+```sql
+CREATE SCHEMA lectura;
+
+CREATE VIEW lectura.personas AS
+  SELECT id_persona, nombre, apellido, fecha_inicio, fecha_fin
+  FROM public.personas;
+
+GRANT USAGE ON SCHEMA lectura TO agente_lectura;
+GRANT SELECT ON ALL TABLES IN SCHEMA lectura TO agente_lectura;
+-- No se otorga USAGE sobre el esquema public.
+```
+
+</Motor>
+<Motor id="mysql" titulo="MySQL: base gimnasio">
+
+```sql
+CREATE DATABASE gimnasio_lectura;
+
+CREATE VIEW gimnasio_lectura.personas AS
+  SELECT id_persona, nombre, apellido, fecha_inicio, fecha_fin
+  FROM gimnasio.personas;
+
+GRANT SELECT, SHOW VIEW ON gimnasio_lectura.* TO 'agente_lectura'@'localhost';
+-- No se otorga ningún privilegio sobre la base gimnasio.
+```
+
+</Motor>
+</PorMotor>
+
+La vista se ejecuta con los privilegios de quien la creó, por lo que el agente puede consultarla sin tener acceso a la tabla original. El mismo resultado puede obtenerse con privilegios por columna (`GRANT SELECT (nombre, apellido) ON personas ...`), también definidos por el estándar, aunque su mantenimiento es más engorroso a medida que crece el esquema.
+
+<Seccion n="3.6" id="credenciales">Manejo de credenciales</Seccion>
+
+La contraseña del usuario del agente no debe escribirse en archivos que se suban a un repositorio ni pegarse en el chat. Lo habitual es guardar la cadena de conexión en una variable de entorno, y que la configuración del cliente haga referencia a esa variable. Algunos clientes pueden leer además un archivo `.env`, que debe excluirse del control de versiones; otros solo transmiten las variables de entorno del sistema. El recuadro al final de esta sección indica qué corresponde al cliente seleccionado.
+
+<PorMotor>
+<Motor id="postgresql" titulo="Cadena de conexión">
+
+```ini
+DB_LECTURA_URL=postgres://agente_lectura:‹CONTRASEÑA›@localhost:5432/cadena_cines
+```
+
+</Motor>
+<Motor id="mysql" titulo="Cadena de conexión">
+
+```ini
+DB_LECTURA_URL=mysql://agente_lectura:‹CONTRASEÑA›@localhost:3306/cadena_cines
+```
+
+</Motor>
+</PorMotor>
+
+<Recuadro tipo="practica">
+Cuando se le pide al agente que configure la conexión, conviene que deje la contraseña como un valor a completar y que sea el usuario quien la escriba en la variable de entorno o en el archivo correspondiente. De ese modo la contraseña nunca forma parte de la conversación.
+</Recuadro>
+
+Si la contraseña contiene alguno de los caracteres `@ : / # ? %`, debe codificarse dentro de la cadena de conexión (por ejemplo, `@` se escribe `%40`); de lo contrario, la cadena se interpreta mal y la conexión falla con un error poco claro.
+
+### Variables de entorno en el cliente seleccionado
+
+<PorCliente>
+
+<Cliente ids="claude-code">
+
+Claude Code transmite las variables de entorno del sistema a los servidores MCP locales que inicia. Además, el archivo `.mcp.json` admite referencias del tipo `${DB_LECTURA_URL}` (o `${DB_LECTURA_URL:-valor}`, con un valor por defecto) en comandos, argumentos y variables. La documentación no indica que lea archivos `.env` para los servidores MCP, por lo que conviene definir la variable en el sistema.
+
+</Cliente>
+
+<Cliente ids="codex">
+
+Codex no expande referencias a variables dentro de `config.toml`. En su lugar, la opción `env_vars` indica qué variables del entorno del usuario se reenvían al servidor (por ejemplo, `env_vars = ["DB_LECTURA_URL"]`), mientras que `env` fija valores escritos en el propio archivo. Para credenciales corresponde `env_vars`.
+
+</Cliente>
+
+<Cliente ids="opencode">
+
+En `opencode.json`, las variables del sistema se referencian con la sintaxis `{env:DB_LECTURA_URL}`; si la variable no está definida, se reemplaza por un texto vacío. La sintaxis `{file:ruta}` permite, además, tomar el valor del contenido de un archivo.
+
+</Cliente>
+
+<Cliente ids="cursor">
+
+En `.cursor/mcp.json`, las variables del sistema se referencian con la sintaxis `${env:DB_LECTURA_URL}`. Cursor es el único de los clientes tratados que puede cargar un archivo `.env` para un servidor local, mediante la opción `envFile` (por ejemplo, `"envFile": "${workspaceFolder}/.env"`). En ese caso, el archivo `.env` debe figurar en `.gitignore`.
+
+</Cliente>
+
+<Cliente ids="claude-desktop">
+
+En Windows, la aplicación de escritorio de Claude transmite a los servidores locales las variables de entorno del usuario. En macOS, las aplicaciones abiertas desde el Dock no leen `~/.zshrc`, y la variable debe definirse en el bloque `env` del archivo de configuración (sección 4.4). En la versión web no hay credenciales de la base en el cliente: el acceso a los servidores remotos se autoriza mediante la cuenta del servicio.
+
+</Cliente>
+
+<Cliente ids="chatgpt">
+
+ChatGPT solo se conecta a servidores remotos, que se autorizan mediante la cuenta del servicio (por ejemplo, Neon o Supabase) y no mediante una cadena de conexión. No corresponde, por lo tanto, definir variables de entorno: la precaución equivalente es limitar el acceso del servidor remoto a un único proyecto y en modo de solo lectura (sección 4.5).
+
+</Cliente>
+
+</PorCliente>
+
+<Seccion n="3.7" id="entornos">Entornos de desarrollo y de producción</Seccion>
+
+Las precauciones de este capítulo no pesan igual en todos los contextos. Una base local creada para practicar puede recrearse en minutos a partir de sus scripts; una base de producción, no.
+
+| Aspecto | Base local de práctica | Base compartida o de producción |
+| --- | --- | --- |
+| Usuario del agente | Puede ser el propio, con escritura | Siempre un usuario exclusivo de solo lectura |
+| Modificaciones | Aceptables, si existe el script para recrearla | Nunca a través del agente |
+| Datos personales reales | No debería haberlos | Vistas sin columnas sensibles |
+| Aprobación en el cliente | Opcional | Obligatoria para toda ejecución |
+| Credenciales | Variable de entorno o archivo `.env` local | Variable de entorno o gestor de secretos |
+
+<Recuadro tipo="ejercicio">
+Sobre la base `cadena_cines`: (a) cree el usuario `agente_lectura` con el script de la sección 3.3; (b) reproduzca los tres recorridos de la figura 3.1 y registre el mensaje de error obtenido en cada caso; (c) conecte un agente con ese usuario y pídale la verificación de la sección 3.4. ¿Coincide el informe del agente con lo que usted comprobó manualmente?
+</Recuadro>

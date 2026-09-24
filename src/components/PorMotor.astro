@@ -1,0 +1,9 @@
+---
+// Agrupa variantes <Motor id="postgresql"> y <Motor id="mysql">. Las pestañas
+// cambian la preferencia global, de modo que todo el sitio muestra el mismo motor.
+---
+<div class="engine-tabs" role="group" aria-label="Motor de base de datos">
+  <button type="button" data-set-engine="postgresql">PostgreSQL</button>
+  <button type="button" data-set-engine="mysql">MySQL</button>
+</div>
+<slot />

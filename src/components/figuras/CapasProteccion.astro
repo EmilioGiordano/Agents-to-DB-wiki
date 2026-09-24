@@ -1,0 +1,133 @@
+---
+// Figura: capas que atraviesa una sentencia antes de llegar a los datos.
+---
+<svg viewBox="0 0 780 330" role="img" aria-labelledby="fig-capas-t fig-capas-d" class="fig-capas">
+  <title id="fig-capas-t">Capas de protección entre el agente y los datos</title>
+  <desc id="fig-capas-d">
+    Tres sentencias salen del agente. La primera, una consulta SELECT, atraviesa las cuatro capas y llega a los datos.
+    La segunda, un DELETE, es rechazada por la configuración de sesión de solo lectura. La tercera desactiva primero el
+    modo de solo lectura y luego intenta el DELETE; es rechazada por los privilegios.
+  </desc>
+  <defs>
+    <marker id="fc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" class="fc-fill-ink" />
+    </marker>
+  </defs>
+
+  <!-- Agente -->
+  <rect x="20" y="95" width="112" height="170" rx="4" class="fc-box" />
+  <text x="76" y="176" class="fc-t fc-strong" text-anchor="middle">Agente</text>
+  <text x="76" y="194" class="fc-t fc-small" text-anchor="middle">emite SQL</text>
+
+  <!-- Etiquetas de las capas -->
+  <g class="fc-t" text-anchor="middle">
+    <text x="215" y="60" class="fc-strong">Aprobación</text>
+    <text x="215" y="76" class="fc-small">en el cliente</text>
+    <text x="345" y="60" class="fc-strong">Credenciales</text>
+    <text x="345" y="76" class="fc-small">usuario propio</text>
+    <text x="475" y="60" class="fc-strong">Sesión</text>
+    <text x="475" y="76" class="fc-small">solo lectura</text>
+    <text x="605" y="60" class="fc-strong fc-accent-t">Privilegios</text>
+    <text x="605" y="76" class="fc-small">GRANT SELECT</text>
+  </g>
+
+  <!-- Capas: discontinuas = contención; continua = límite de seguridad -->
+  <rect x="211" y="95" width="8" height="170" class="fc-gate fc-gate--soft" />
+  <rect x="341" y="95" width="8" height="170" class="fc-gate fc-gate--soft" />
+  <rect x="471" y="95" width="8" height="170" class="fc-gate fc-gate--soft" />
+  <rect x="601" y="95" width="8" height="170" class="fc-gate fc-gate--hard" />
+
+  <!-- Datos -->
+  <path d="M665 105 v150 a45 11 0 0 0 90 0 v-150" class="fc-box" />
+  <ellipse cx="710" cy="105" rx="45" ry="11" class="fc-box" />
+  <text x="710" y="184" class="fc-t fc-strong" text-anchor="middle">Datos</text>
+
+  <!-- Recorridos -->
+  <g class="fc-lane">
+    <line x1="162" y1="130" x2="660" y2="130" marker-end="url(#fc-arrow)" />
+    <line x1="162" y1="180" x2="466" y2="180" />
+    <line x1="162" y1="230" x2="596" y2="230" />
+  </g>
+  <g class="fc-stop">
+    <path d="M459 173 l14 14 M473 173 l-14 14" />
+    <path d="M589 223 l14 14 M603 223 l-14 14" />
+  </g>
+  <g class="fc-t fc-small fc-warn-t" text-anchor="end">
+    <text x="452" y="172">rechazado</text>
+    <text x="582" y="222">rechazado</text>
+  </g>
+
+  <!-- Numeración de recorridos -->
+  <g class="fc-t fc-num" text-anchor="middle">
+    <circle cx="150" cy="130" r="10" class="fc-numbg" /><text x="150" y="134">1</text>
+    <circle cx="150" cy="180" r="10" class="fc-numbg" /><text x="150" y="184">2</text>
+    <circle cx="150" cy="230" r="10" class="fc-numbg" /><text x="150" y="234">3</text>
+  </g>
+
+  <!-- Referencias -->
+  <g class="fc-t fc-small">
+    <rect x="20" y="296" width="8" height="18" class="fc-gate fc-gate--hard" />
+    <text x="38" y="309">Límite de seguridad: el motor impide la operación.</text>
+    <rect x="390" y="296" width="8" height="18" class="fc-gate fc-gate--soft" />
+    <text x="408" y="309">Contención: reduce el riesgo, pero puede eludirse.</text>
+  </g>
+</svg>
+
+<style>
+  .fig-capas .fc-t {
+    font-family: var(--sans);
+    font-size: 13px;
+    fill: var(--ink);
+  }
+  .fig-capas .fc-strong {
+    font-weight: 600;
+  }
+  .fig-capas .fc-small {
+    font-size: 11.5px;
+    fill: var(--ink-2);
+    font-weight: 400;
+  }
+  .fig-capas .fc-accent-t {
+    fill: var(--accent);
+  }
+  .fig-capas .fc-warn-t {
+    fill: var(--warn);
+  }
+  .fig-capas .fc-box {
+    fill: var(--paper-2);
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+  }
+  .fig-capas .fc-gate--soft {
+    fill: var(--paper);
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+    stroke-dasharray: 4 3;
+  }
+  .fig-capas .fc-gate--hard {
+    fill: var(--accent);
+    stroke: var(--accent);
+    stroke-width: 1.25;
+  }
+  .fig-capas .fc-lane line {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+  }
+  .fig-capas .fc-fill-ink {
+    fill: var(--ink);
+  }
+  .fig-capas .fc-stop path {
+    stroke: var(--warn);
+    stroke-width: 2.25;
+    stroke-linecap: round;
+  }
+  .fig-capas .fc-numbg {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: 1.25;
+  }
+  .fig-capas .fc-num text {
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+</style>

@@ -1,0 +1,74 @@
+---
+import Base from './Base.astro';
+import { capitulos, hrefCapitulo } from '../data/toc';
+import { url } from '../lib/url';
+
+interface Seccion {
+  n: string;
+  id: string;
+  titulo: string;
+}
+interface Props {
+  frontmatter: {
+    num: string;
+    titulo: string;
+    lede?: string;
+    secciones?: Seccion[];
+  };
+}
+
+const { num, titulo, lede, secciones = [] } = Astro.props.frontmatter;
+const idx = capitulos.findIndex((c) => c.num === num);
+const prev = idx > 0 ? capitulos[idx - 1] : null;
+const next = idx < capitulos.length - 1 ? capitulos[idx + 1] : null;
+const esApendice = (n: string) => /[A-Z]/.test(n);
+const principales = capitulos.filter((c) => !esApendice(c.num));
+const apendices = capitulos.filter((c) => esApendice(c.num));
+const kicker = esApendice(num) ? `Apéndice ${num}` : `Capítulo ${num}`;
+---
+
+<Base title={`${num}. ${titulo} | Agentes de IA y bases de datos`}>
+  <div class="shell">
+    <nav class="nav" aria-label="Índice de la guía">
+      <details open>
+        <summary>Índice</summary>
+        {[principales, apendices].map((grupo, gi) => (
+          <ol class={gi === 1 ? 'nav__appx' : undefined}>
+            {grupo.map((c) => (
+              <li>
+                <a href={url(hrefCapitulo(c))} aria-current={c.num === num ? 'page' : undefined} class={c.listo ? undefined : 'draft'}>
+                  <span class="n">{c.num}</span>
+                  <span>{c.titulo}{!c.listo && <span class="draft-tag">en redacción</span>}</span>
+                </a>
+                {c.num === num && secciones.length > 0 && (
+                  <ol class="sub">
+                    {secciones.map((s) => (
+                      <li><a href={`#${s.id}`}>{s.n} {s.titulo}</a></li>
+                    ))}
+                  </ol>
+                )}
+              </li>
+            ))}
+          </ol>
+        ))}
+      </details>
+    </nav>
+
+    <main class="page" id="contenido">
+      <header class="chapter-head">
+        <p class="kicker">{kicker}</p>
+        <h1>{titulo}</h1>
+        {lede && <p class="lede">{lede}</p>}
+      </header>
+
+      <article class="prose">
+        <slot />
+      </article>
+
+      <nav class="pager" aria-label="Capítulos contiguos">
+        {prev ? <a href={url(hrefCapitulo(prev))}><small>Anterior</small>{prev.num}. {prev.titulo}</a> : <span />}
+        {next ? <a class="next" href={url(hrefCapitulo(next))}><small>Siguiente</small>{next.num}. {next.titulo}</a> : <span />}
+      </nav>
+    </main>
+  </div>
+</Base>

@@ -1,0 +1,125 @@
+---
+// Figura: cada estado del repositorio define un estado reproducible de la base.
+---
+<svg viewBox="0 0 820 330" role="img" aria-labelledby="fig-ver-t fig-ver-d" class="fig-ver">
+  <title id="fig-ver-t">Versionado de la base de datos junto al código</title>
+  <desc id="fig-ver-d">
+    La rama main y una rama de trabajo en Git. Desde el último commit de main se construye la base cine_main con los
+    scripts de db/base. Desde la rama se construye cine_rama con los mismos scripts más el archivo de cambios de la rama.
+    El agente compara ambas bases. Al integrar la rama, el cambio pasa a formar parte de db/base.
+  </desc>
+  <defs>
+    <marker id="fv-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" class="fv-fill-ink2" />
+    </marker>
+  </defs>
+
+  <!-- Ramas -->
+  <g class="fv-t fv-small">
+    <text x="30" y="44">main</text>
+    <text x="400" y="160">rama: indice-ventas</text>
+  </g>
+  <line x1="30" y1="60" x2="790" y2="60" class="fv-main" />
+  <path d="M300 60 C 340 60, 340 130, 380 130 L 560 130 C 600 130, 600 60, 640 60" class="fv-branch" />
+
+  <g class="fv-commit">
+    <circle cx="90" cy="60" r="7" />
+    <circle cx="190" cy="60" r="7" />
+    <circle cx="300" cy="60" r="7" class="fv-key" />
+    <circle cx="430" cy="130" r="7" class="fv-rama" />
+    <circle cx="520" cy="130" r="7" class="fv-rama fv-key" />
+    <circle cx="640" cy="60" r="7" />
+  </g>
+  <g class="fv-t fv-small" text-anchor="middle">
+    <text x="640" y="40">integración</text>
+  </g>
+
+  <!-- Construcción de las bases -->
+  <line x1="300" y1="70" x2="230" y2="202" class="fv-dash" marker-end="url(#fv-arrow)" />
+  <line x1="520" y1="140" x2="560" y2="202" class="fv-dash" marker-end="url(#fv-arrow)" />
+
+  <g class="fv-db">
+    <path d="M130 212 v70 a95 12 0 0 0 190 0 v-70" />
+    <ellipse cx="225" cy="212" rx="95" ry="12" />
+  </g>
+  <text x="225" y="246" text-anchor="middle" class="fv-t fv-strong">cine_main</text>
+  <text x="225" y="266" text-anchor="middle" class="fv-t fv-mono">db/base/*.sql</text>
+
+  <g class="fv-db fv-db--rama">
+    <path d="M450 212 v70 a130 12 0 0 0 260 0 v-70" />
+    <ellipse cx="580" cy="212" rx="130" ry="12" />
+  </g>
+  <text x="580" y="246" text-anchor="middle" class="fv-t fv-strong">cine_rama</text>
+  <text x="580" y="266" text-anchor="middle" class="fv-t fv-mono">db/base/*.sql</text>
+  <text x="580" y="283" text-anchor="middle" class="fv-t fv-mono">+ db/cambios/indice-ventas.sql</text>
+
+  <!-- Comparación -->
+  <line x1="328" y1="258" x2="442" y2="258" class="fv-cmp" marker-start="url(#fv-arrow)" marker-end="url(#fv-arrow)" />
+  <text x="385" y="244" text-anchor="middle" class="fv-t fv-small">el agente compara</text>
+  <text x="385" y="280" text-anchor="middle" class="fv-t fv-small">planes, pruebas, datos</text>
+</svg>
+
+<style>
+  .fig-ver .fv-t {
+    font-family: var(--sans);
+    font-size: 13px;
+    fill: var(--ink);
+  }
+  .fig-ver .fv-strong {
+    font-weight: 600;
+  }
+  .fig-ver .fv-small {
+    font-size: 12px;
+    fill: var(--ink-2);
+  }
+  .fig-ver .fv-mono {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+  .fig-ver .fv-main {
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .fig-ver .fv-branch {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .fig-ver .fv-commit circle {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .fig-ver .fv-commit circle.fv-rama {
+    stroke: var(--accent);
+  }
+  .fig-ver .fv-commit circle.fv-key {
+    fill: var(--ink);
+  }
+  .fig-ver .fv-commit circle.fv-rama.fv-key {
+    fill: var(--accent);
+  }
+  .fig-ver .fv-dash {
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+    stroke-dasharray: 4 3;
+  }
+  .fig-ver .fv-cmp {
+    stroke: var(--ink-2);
+    stroke-width: 1.5;
+  }
+  .fig-ver .fv-fill-ink2 {
+    fill: var(--ink-2);
+  }
+  .fig-ver .fv-db path,
+  .fig-ver .fv-db ellipse {
+    fill: var(--paper-2);
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+  }
+  .fig-ver .fv-db--rama path,
+  .fig-ver .fv-db--rama ellipse {
+    stroke: var(--accent);
+  }
+</style>

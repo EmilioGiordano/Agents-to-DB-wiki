@@ -1,0 +1,5 @@
+---
+interface Props { n: string; id: string }
+const { n, id } = Astro.props;
+---
+<h2 id={id}><span class="secnum">{n}</span><span><slot /></span></h2>

@@ -1,0 +1,5 @@
+---
+interface Props { id: 'postgresql' | 'mysql'; titulo?: string }
+const { id, titulo } = Astro.props;
+---
+<div class="variant" data-engine-only={id} data-code-title={titulo}><slot /></div>
