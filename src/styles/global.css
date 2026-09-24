@@ -271,6 +271,156 @@ select {
   padding: 0.3rem 0.6rem;
   cursor: pointer;
 }
+/* Menús desplegables de la barra superior (cliente y tema) */
+.menu {
+  position: relative;
+}
+.menu svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 30;
+  min-width: 9.5rem;
+  padding: 0.3rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+}
+.menu-list[hidden] {
+  display: none;
+}
+.menu-list button {
+  display: grid;
+  grid-template-columns: 1.05rem 1fr 1.05rem;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.menu-list button:hover,
+.menu-list button:focus-visible {
+  background: var(--paper-2);
+  outline: none;
+}
+.menu-list .check {
+  visibility: hidden;
+}
+.menu-list button[aria-checked='true'] .check {
+  visibility: visible;
+  color: var(--accent);
+}
+
+/* Selector de tema: botón cuadrado con el ícono del modo activo */
+.theme-trigger {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.theme-trigger:hover,
+.theme-trigger[aria-expanded='true'] {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+.theme-trigger svg {
+  display: none;
+}
+.theme-trigger[data-pref='sistema'] [data-icon='sistema'],
+.theme-trigger[data-pref='claro'] [data-icon='claro'],
+.theme-trigger[data-pref='oscuro'] [data-icon='oscuro'] {
+  display: block;
+}
+
+/* Selector de cliente */
+.client-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 9.5rem;
+  height: 2rem;
+  padding: 0 0.5rem 0 0.7rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.client-trigger:hover,
+.client-trigger[aria-expanded='true'] {
+  border-color: var(--ink-2);
+}
+.client-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-trigger .chevron {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--ink-2);
+  transition: transform 0.15s ease;
+}
+.client-trigger[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+.client-list {
+  width: 16rem;
+}
+.client-list button {
+  grid-template-columns: 1fr 1.05rem;
+}
+.client-list [role='group'] + [role='group'] {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--rule);
+}
+.menu-group {
+  margin: 0;
+  padding: 0.45rem 0.55rem 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.menu-item-text {
+  display: grid;
+  gap: 0.05rem;
+  line-height: 1.3;
+}
+.menu-item-name {
+  font-weight: 600;
+}
+.menu-item-detail {
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
 .icon-btn:hover {
   color: var(--ink);
 }
@@ -950,8 +1100,10 @@ select {
   .pref {
     font-size: 0.8125rem;
   }
-  #sel-client {
-    max-width: 9.5rem;
+  .client-list {
+    left: 0;
+    right: auto;
+    width: min(16rem, calc(100vw - 2rem));
   }
   .figure__canvas {
     overflow-x: auto;

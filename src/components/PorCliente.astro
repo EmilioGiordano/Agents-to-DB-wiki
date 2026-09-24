@@ -7,6 +7,6 @@ const { solo } = Astro.props;
 const lista = solo ? clientes.filter((c) => solo.includes(c.id)) : clientes;
 ---
 <div class="client-tabs" role="group" aria-label="Cliente">
-  {lista.map((c) => <button type="button" data-set-client={c.id}>{c.nombre}</button>)}
+  {lista.map((c) => <button type="button" data-set-client={c.id}>{"pestana" in c ? c.pestana : c.nombre}</button>)}
 </div>
 <slot />

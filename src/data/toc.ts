@@ -122,12 +122,12 @@ export const capitulos: Capitulo[] = [
 export const hrefCapitulo = (c: Capitulo) => `/guia/${c.slug}/`;
 
 export const clientes = [
-  { id: 'claude-code', nombre: 'Claude Code' },
-  { id: 'codex', nombre: 'Codex' },
-  { id: 'opencode', nombre: 'OpenCode' },
-  { id: 'cursor', nombre: 'Cursor' },
-  { id: 'claude-desktop', nombre: 'Claude (escritorio y web)' },
-  { id: 'chatgpt', nombre: 'ChatGPT' },
+  { id: 'claude-code', nombre: 'Claude Code', grupo: 'agente', detalle: 'Agente de terminal, Anthropic' },
+  { id: 'codex', nombre: 'Codex', grupo: 'agente', detalle: 'Agente de terminal, OpenAI' },
+  { id: 'opencode', nombre: 'OpenCode', grupo: 'agente', detalle: 'Agente de terminal, código abierto' },
+  { id: 'cursor', nombre: 'Cursor', grupo: 'agente', detalle: 'Editor con agente integrado' },
+  { id: 'claude-desktop', nombre: 'Claude', pestana: 'Claude (escritorio y web)', grupo: 'asistente', detalle: 'Aplicación de escritorio y web' },
+  { id: 'chatgpt', nombre: 'ChatGPT', grupo: 'asistente', detalle: 'Web, modo desarrollador' },
 ];
 
 export const motores = [
